@@ -1,0 +1,9 @@
+[deps]
+Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+ERGMCount = "a7b8c9d0-e1f2-3456-7890-123456789abc"
+
+[sources]
+ERGMCount = {path = ".."}
+
+[compat]
+Documenter = "1"
