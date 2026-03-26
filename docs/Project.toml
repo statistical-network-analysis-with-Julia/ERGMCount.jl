@@ -1,9 +1,13 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+ERGM = "c3d4e5f6-a7b8-9012-cdef-345678901234"
 ERGMCount = "a7b8c9d0-e1f2-3456-7890-123456789abc"
+Network = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
 
 [sources]
 ERGMCount = {path = ".."}
+ERGM = {url = "https://github.com/statistical-network-analysis-with-Julia/ERGM.jl.git"}
+Network = {url = "https://github.com/statistical-network-analysis-with-Julia/Network.jl.git"}
 
 [compat]
 Documenter = "1"
