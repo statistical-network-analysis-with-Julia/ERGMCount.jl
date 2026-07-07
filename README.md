@@ -66,11 +66,11 @@ PoissonReference(λ=1.0)
 
 # Geometric: for counts with high variance
 # h(y) ∝ (1-p)^y
-GeometricReference(p=0.5)
+GeometricReference()   # counting measure h(y)=1; shape comes from a negative Sum coefficient
 
 # Binomial: for bounded counts (0 to n)
 # h(y) = C(n,y) p^y (1-p)^(n-y)
-BinomialReference(n=10, p=0.5)
+BinomialReference(10)  # h(y) = C(10, y); bounded counts
 
 # Discrete Uniform: equal probability for 0:max
 DiscUnifReference(max=10)

@@ -206,7 +206,7 @@ println("Model 2: ", length(terms2), " terms, converged=", result2.converged)
 terms = [SumTerm(), NonzeroTerm()]
 
 result_pois = ergm_count(net, terms; reference=PoissonReference(1.0))
-result_geom = ergm_count(net, terms; reference=GeometricReference(0.5))
+result_geom = ergm_count(net, terms; reference=GeometricReference())
 
 println("Poisson: ", round.(result_pois.coefficients, digits=3))
 println("Geometric: ", round.(result_geom.coefficients, digits=3))

@@ -1,8 +1,8 @@
 [deps]
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
-ERGM = "c3d4e5f6-a7b8-9012-cdef-345678901234"
-ERGMCount = "a7b8c9d0-e1f2-3456-7890-123456789abc"
-Network = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+ERGM = "d623cd87-b018-4e2a-bf53-b77ebcdc9da2"
+ERGMCount = "7556d106-17e3-4d5c-b2ff-836722c37052"
+Network = "027a387e-e55f-4537-a155-5037e5a23bdb"
 
 [sources]
 ERGMCount = {path = ".."}

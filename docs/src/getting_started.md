@@ -90,10 +90,10 @@ The reference measure determines the baseline distribution for edge values. This
 ref = PoissonReference(1.0)
 
 # Geometric: for counts with high variance
-ref = GeometricReference(0.5)
+ref = GeometricReference()
 
 # Binomial: for bounded counts (0 to n)
-ref = BinomialReference(10, 0.5)
+ref = BinomialReference(10)
 
 # Discrete Uniform: equal probability on {0, 1, ..., max}
 ref = DiscUnifReference(10)
@@ -311,7 +311,7 @@ println("Model 2 converged: ", result2.converged)
 terms = [SumTerm(), NonzeroTerm(), CountMutualTerm()]
 
 result_poisson = ergm_count(net, terms; reference=PoissonReference(1.0))
-result_geom = ergm_count(net, terms; reference=GeometricReference(0.5))
+result_geom = ergm_count(net, terms; reference=GeometricReference())
 
 println("Poisson coefficients: ", round.(result_poisson.coefficients, digits=3))
 println("Geometric coefficients: ", round.(result_geom.coefficients, digits=3))

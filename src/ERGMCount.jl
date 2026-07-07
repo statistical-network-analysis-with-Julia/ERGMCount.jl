@@ -8,7 +8,7 @@ The general form is:
     P(Y=y) ∝ h(y) exp(θ' g(y))
 
 where h(y) is the reference measure determining the baseline distribution
-for count-valued edges.
+for count-valued edges (Krivitsky 2012).
 
 Port of the R ergm.count package from the StatNet collection.
 """
@@ -19,22 +19,24 @@ using ERGM
 using Graphs
 using LinearAlgebra
 using Network
-using Optim
-using Random
-using Statistics
 using StatsBase
+
+import ERGM: name, compute
 
 # Reference measures
 export PoissonReference, GeometricReference, BinomialReference
 export DiscUnifReference, DiscUnif2Reference
+export log_reference, sample_reference
 
 # Count-specific terms
 export SumTerm, NonzeroTerm, GreaterthannTerm
 export CountMutualTerm, TransitiveTiesTerm, CyclicalTiesTerm
 export NodeOSumTerm, NodeISumTerm, NodeSumTerm
 export CountAtleastnTerm
+export change_stat_count
 
-# Estimation
+# Model / estimation
+export CountERGMModel, CountERGMResult
 export ergm_count, fit_count_ergm
 
 # Simulation
@@ -51,11 +53,18 @@ Base type for reference measures in count ERGMs.
 """
 abstract type AbstractReferenceMeasure end
 
+# log(y!) without external dependencies; exact for the modest counts used
+# in dyad supports
+_logfactorial(y::Int) = sum(log, 2:y; init=0.0)
+
 """
     PoissonReference
 
 Poisson reference measure for count ERGMs.
 h(y_ij) = λ^y_ij / y_ij!
+
+With this reference and a `SumTerm` coefficient θ, each dyad is
+conditionally Poisson(λ·e^θ) (Krivitsky 2012).
 
 # Fields
 - `lambda::Float64`: Rate parameter (default 1.0)
@@ -66,7 +75,7 @@ struct PoissonReference <: AbstractReferenceMeasure
 end
 
 function log_reference(ref::PoissonReference, y::Int)
-    return y * log(ref.lambda) - logfactorial(y)
+    return y * log(ref.lambda) - _logfactorial(y)
 end
 
 function sample_reference(ref::PoissonReference)
@@ -76,56 +85,48 @@ end
 """
     GeometricReference
 
-Geometric reference measure for count ERGMs.
-h(y_ij) = (1-p)^{y_ij}
-
-# Fields
-- `prob::Float64`: Success probability (default 0.5)
+Geometric reference measure for count ERGMs: the *counting measure*
+h(y_ij) = 1 on {0, 1, 2, …}, as in `ergm.count`/Krivitsky (2012). The
+geometric shape of the dyad distribution comes from a negative `SumTerm`
+coefficient, not from the reference itself, so this measure has no free
+parameter.
 """
-struct GeometricReference <: AbstractReferenceMeasure
-    prob::Float64
+struct GeometricReference <: AbstractReferenceMeasure end
 
-    function GeometricReference(p::Float64=0.5)
-        0 < p < 1 || throw(ArgumentError("prob must be in (0, 1)"))
-        new(p)
-    end
-end
+log_reference(::GeometricReference, y::Int) = 0.0
 
-function log_reference(ref::GeometricReference, y::Int)
-    return y * log(1 - ref.prob)
-end
-
-function sample_reference(ref::GeometricReference)
-    return rand(Geometric(ref.prob))
-end
+# The counting measure is improper on its own; sample from the geometric
+# shape a unit negative Sum coefficient would induce
+sample_reference(::GeometricReference) = rand(Geometric(1 - exp(-1)))
 
 """
     BinomialReference
 
-Binomial reference measure for count ERGMs (for bounded counts).
-h(y_ij) = C(n, y_ij) p^{y_ij} (1-p)^{n-y_ij}
+Binomial reference measure for count ERGMs (for bounded counts):
+h(y_ij) = C(trials, y_ij), matching `ergm.count`'s `Binomial(trials)`.
+The success probability is absorbed into the estimated `SumTerm`
+coefficient rather than parameterizing the reference.
 
 # Fields
-- `n::Int`: Number of trials
-- `prob::Float64`: Success probability
+- `trials::Int`: Number of trials (maximum count value)
 """
 struct BinomialReference <: AbstractReferenceMeasure
-    n::Int
-    prob::Float64
+    trials::Int
 
-    function BinomialReference(n::Int, p::Float64=0.5)
-        n > 0 || throw(ArgumentError("n must be positive"))
-        0 <= p <= 1 || throw(ArgumentError("prob must be in [0, 1]"))
-        new(n, p)
+    function BinomialReference(trials::Int)
+        trials > 0 || throw(ArgumentError("trials must be positive"))
+        new(trials)
     end
 end
 
 function log_reference(ref::BinomialReference, y::Int)
-    return logpdf(Binomial(ref.n, ref.prob), y)
+    (0 <= y <= ref.trials) || return -Inf
+    return _logfactorial(ref.trials) - _logfactorial(y) -
+           _logfactorial(ref.trials - y)
 end
 
 function sample_reference(ref::BinomialReference)
-    return rand(Binomial(ref.n, ref.prob))
+    return rand(Binomial(ref.trials, 0.5))
 end
 
 """
@@ -177,30 +178,75 @@ function sample_reference(ref::DiscUnif2Reference)
     return rand(ref.a:ref.b)
 end
 
+# Dyad-value support used when enumerating conditional distributions.
+# `max_val` truncates unbounded supports (Poisson/geometric).
+_support(::PoissonReference, max_val::Int) = 0:max_val
+_support(::GeometricReference, max_val::Int) = 0:max_val
+_support(ref::BinomialReference, ::Int) = 0:ref.trials
+_support(ref::DiscUnifReference, ::Int) = 0:ref.max
+_support(ref::DiscUnif2Reference, ::Int) = ref.a:ref.b
+
+# =============================================================================
+# Dyad values
+# =============================================================================
+
+# Canonical edge-attribute key: (i,j) directed, (min,max) undirected
+_wkey(net, i::Int, j::Int) = is_directed(net) ? (i, j) : minmax(i, j)
+
+"""
+    dyad_value(net, weights, i, j) -> Int
+
+The count value of dyad (i,j): 0 when the edge is absent, its `:weight`
+attribute when present (edges without the attribute count as 1).
+"""
+function dyad_value(net, weights, i::Int, j::Int)
+    has_edge(net, i, j) || return 0
+    return Int(get(weights, _wkey(net, i, j), 1))
+end
+
+_get_weights(net) = get_edge_attribute(net, :weight)
+
 # =============================================================================
 # Count-Specific Terms
 # =============================================================================
+#
+# Each term implements:
+#   compute(term, net) — the full statistic
+#   change_stat_count(term, net, weights, i, j, old, new) — the change in
+#     the statistic when dyad (i,j) moves from value `old` to `new`,
+#     holding all other dyads fixed. Implementations must not read the
+#     dyad's own current value from the network (old/new are authoritative).
+
+"""
+    change_stat_count(term, net, weights, i, j, old, new) -> Float64
+
+Change in `compute(term, net)` when dyad (i,j) moves from count `old` to
+count `new`, holding all other dyads fixed. `weights` is the `:weight`
+edge-attribute dictionary (`get_edge_attribute(net, :weight)`).
+"""
+function change_stat_count end
 
 """
     SumTerm <: AbstractERGMTerm
 
 Sum of edge values: ∑_{i,j} y_{ij}
-This is the natural sufficient statistic for Poisson reference.
+This is the natural sufficient statistic for the Poisson reference.
 """
 struct SumTerm <: AbstractERGMTerm end
 
 name(::SumTerm) = "sum"
 
 function compute(::SumTerm, net)
-    weights = get_edge_attribute(net, :weight)
-    isnothing(weights) && return Float64(ne(net))
-    return Float64(sum(values(weights)))
+    weights = _get_weights(net)
+    total = 0.0
+    for e in edges(net)
+        total += Float64(get(weights, _wkey(net, src(e), dst(e)), 1))
+    end
+    return total
 end
 
-function change_stat(::SumTerm, net, i::Int, j::Int, delta::Int=1)
-    # Change when edge value changes by delta
-    return Float64(delta)
-end
+change_stat_count(::SumTerm, net, weights, i::Int, j::Int, old::Int, new::Int) =
+    Float64(new - old)
 
 """
     NonzeroTerm <: AbstractERGMTerm
@@ -211,19 +257,10 @@ struct NonzeroTerm <: AbstractERGMTerm end
 
 name(::NonzeroTerm) = "nonzero"
 
-function compute(::NonzeroTerm, net)
-    return Float64(ne(net))
-end
+compute(::NonzeroTerm, net) = Float64(ne(net))
 
-function change_stat(::NonzeroTerm, net, i::Int, j::Int, old_val::Int, new_val::Int)
-    if old_val == 0 && new_val > 0
-        return 1.0
-    elseif old_val > 0 && new_val == 0
-        return -1.0
-    else
-        return 0.0
-    end
-end
+change_stat_count(::NonzeroTerm, net, weights, i::Int, j::Int, old::Int, new::Int) =
+    Float64((new > 0) - (old > 0))
 
 """
     GreaterthannTerm <: AbstractERGMTerm
@@ -240,10 +277,17 @@ end
 name(t::GreaterthannTerm) = "greaterthan.$(t.threshold)"
 
 function compute(t::GreaterthannTerm, net)
-    weights = get_edge_attribute(net, :weight)
-    isnothing(weights) && return 0.0
-    return Float64(count(w -> w > t.threshold, values(weights)))
+    weights = _get_weights(net)
+    total = 0.0
+    for e in edges(net)
+        w = get(weights, _wkey(net, src(e), dst(e)), 1)
+        w > t.threshold && (total += 1.0)
+    end
+    return total
 end
+
+change_stat_count(t::GreaterthannTerm, net, weights, i::Int, j::Int, old::Int, new::Int) =
+    Float64((new > t.threshold) - (old > t.threshold))
 
 """
     CountAtleastnTerm <: AbstractERGMTerm
@@ -257,10 +301,17 @@ end
 name(t::CountAtleastnTerm) = "atleast.$(t.threshold)"
 
 function compute(t::CountAtleastnTerm, net)
-    weights = get_edge_attribute(net, :weight)
-    isnothing(weights) && return 0.0
-    return Float64(count(w -> w >= t.threshold, values(weights)))
+    weights = _get_weights(net)
+    total = 0.0
+    for e in edges(net)
+        w = get(weights, _wkey(net, src(e), dst(e)), 1)
+        w >= t.threshold && (total += 1.0)
+    end
+    return total
 end
+
+change_stat_count(t::CountAtleastnTerm, net, weights, i::Int, j::Int, old::Int, new::Int) =
+    Float64((new >= t.threshold) - (old >= t.threshold))
 
 """
     CountMutualTerm <: AbstractERGMTerm
@@ -275,59 +326,86 @@ name(::CountMutualTerm) = "mutual.count"
 function compute(::CountMutualTerm, net)
     !is_directed(net) && return 0.0
 
-    weights = get_edge_attribute(net, :weight)
+    weights = _get_weights(net)
     total = 0.0
     n = nv(net)
 
     for i in 1:n, j in (i+1):n
-        w_ij = if !isnothing(weights)
-            get(weights, (i, j), 0)
-        else
-            has_edge(net, i, j) ? 1 : 0
-        end
-        w_ji = if !isnothing(weights)
-            get(weights, (j, i), 0)
-        else
-            has_edge(net, j, i) ? 1 : 0
-        end
-        total += min(w_ij, w_ji)
+        total += min(dyad_value(net, weights, i, j),
+                     dyad_value(net, weights, j, i))
     end
 
     return total
 end
 
+function change_stat_count(::CountMutualTerm, net, weights, i::Int, j::Int,
+                           old::Int, new::Int)
+    is_directed(net) || return 0.0
+    y_ji = dyad_value(net, weights, j, i)
+    return Float64(min(new, y_ji) - min(old, y_ji))
+end
+
 """
     TransitiveTiesTerm <: AbstractERGMTerm
 
-Weighted transitivity: ∑_{i,j,k} min(y_{ij}, y_{jk}, y_{ik})
+Triadic-minimum transitivity over ordered distinct triples:
+∑_{i≠j≠k} min(y_{ij}, y_{jk}, y_{ik})
+
+Note this is a simple valued transitivity; it is related to but not
+identical to `ergm.count`'s `transitiveweights(min, max, min)` statistic.
 """
 struct TransitiveTiesTerm <: AbstractERGMTerm end
 
 name(::TransitiveTiesTerm) = "transitiveties.count"
 
 function compute(::TransitiveTiesTerm, net)
-    weights = get_edge_attribute(net, :weight)
+    weights = _get_weights(net)
     n = nv(net)
     total = 0.0
 
-    get_weight(i, j) = if !isnothing(weights)
-        get(weights, (i, j), 0)
-    else
-        has_edge(net, i, j) ? 1 : 0
-    end
+    w(i, j) = dyad_value(net, weights, i, j)
 
     for i in 1:n, j in 1:n, k in 1:n
-        i == j || j == k || i == k || continue
-        total += min(get_weight(i, j), get_weight(j, k), get_weight(i, k))
+        (i == j || j == k || i == k) && continue
+        total += min(w(i, j), w(j, k), w(i, k))
     end
 
     return total
 end
 
+function change_stat_count(::TransitiveTiesTerm, net, weights, i::Int, j::Int,
+                           old::Int, new::Int)
+    n = nv(net)
+    w(a, b) = dyad_value(net, weights, a, b)
+
+    delta = 0.0
+    if is_directed(net)
+        for k in 1:n
+            (k == i || k == j) && continue
+            # Dyad (i,j) in role (a,b): triples (i, j, k) use min(y_ij, y_jk, y_ik)
+            delta += min(new, w(j, k), w(i, k)) - min(old, w(j, k), w(i, k))
+            # Role (b,c): triples (k, i, j) use min(y_ki, y_ij, y_kj)
+            delta += min(w(k, i), new, w(k, j)) - min(w(k, i), old, w(k, j))
+            # Role (a,c): triples (i, k, j) use min(y_ik, y_kj, y_ij)
+            delta += min(w(i, k), w(k, j), new) - min(w(i, k), w(k, j), old)
+        end
+    else
+        # Undirected: every ordered distinct triple over {i, j, k} uses the
+        # same three pair values, so pair {i,j} appears in 6 ordered triples
+        # per third vertex k
+        for k in 1:n
+            (k == i || k == j) && continue
+            delta += 6 * (min(new, w(j, k), w(i, k)) - min(old, w(j, k), w(i, k)))
+        end
+    end
+    return delta
+end
+
 """
     CyclicalTiesTerm <: AbstractERGMTerm
 
-Weighted cyclicality: ∑_{i,j,k} min(y_{ij}, y_{jk}, y_{ki})
+Weighted cyclicality: (1/3) ∑_{i≠j≠k} min(y_{ij}, y_{jk}, y_{ki})
+(each 3-cycle counted once).
 """
 struct CyclicalTiesTerm <: AbstractERGMTerm end
 
@@ -336,90 +414,155 @@ name(::CyclicalTiesTerm) = "cyclicalties.count"
 function compute(::CyclicalTiesTerm, net)
     !is_directed(net) && return 0.0
 
-    weights = get_edge_attribute(net, :weight)
+    weights = _get_weights(net)
     n = nv(net)
     total = 0.0
 
-    get_weight(i, j) = if !isnothing(weights)
-        get(weights, (i, j), 0)
-    else
-        has_edge(net, i, j) ? 1 : 0
-    end
+    w(i, j) = dyad_value(net, weights, i, j)
 
     for i in 1:n, j in 1:n, k in 1:n
-        i == j || j == k || i == k || continue
-        total += min(get_weight(i, j), get_weight(j, k), get_weight(k, i))
+        (i == j || j == k || i == k) && continue
+        total += min(w(i, j), w(j, k), w(k, i))
     end
 
-    return total / 3  # Each cycle counted 3 times
+    return total / 3  # Each cycle counted 3 times (rotations)
+end
+
+function change_stat_count(::CyclicalTiesTerm, net, weights, i::Int, j::Int,
+                           old::Int, new::Int)
+    is_directed(net) || return 0.0
+    n = nv(net)
+    w(a, b) = dyad_value(net, weights, a, b)
+
+    # Dyad (i,j) appears once in each of the 3 rotations of a cycle
+    # {i→j, j→k, k→i}; the statistic divides by 3, so the net change is
+    # one un-rotated sum over k
+    delta = 0.0
+    for k in 1:n
+        (k == i || k == j) && continue
+        delta += min(new, w(j, k), w(k, i)) - min(old, w(j, k), w(k, i))
+    end
+    return delta
 end
 
 """
     NodeOSumTerm <: AbstractERGMTerm
 
-Sum of outgoing edge values by node: measures activity heterogeneity.
-Coefficient on sum of squared out-strengths.
+Sum of squared out-strengths: measures activity heterogeneity.
+Directed networks only (0 for undirected; use `NodeSumTerm` there).
 """
 struct NodeOSumTerm <: AbstractERGMTerm end
 
 name(::NodeOSumTerm) = "nodeOSum"
 
 function compute(::NodeOSumTerm, net)
-    weights = get_edge_attribute(net, :weight)
+    is_directed(net) || return 0.0
+    weights = _get_weights(net)
     n = nv(net)
     out_strength = zeros(n)
 
     for e in edges(net)
-        w = isnothing(weights) ? 1 : get(weights, (src(e), dst(e)), 1)
+        w = get(weights, _wkey(net, src(e), dst(e)), 1)
         out_strength[src(e)] += w
     end
 
     return sum(out_strength .^ 2)
 end
 
+function _out_strength(net, weights, v::Int)
+    s = 0.0
+    for u in outneighbors(net, v)
+        s += dyad_value(net, weights, v, u)
+    end
+    return s
+end
+
+function _in_strength(net, weights, v::Int)
+    s = 0.0
+    for u in inneighbors(net, v)
+        s += dyad_value(net, weights, u, v)
+    end
+    return s
+end
+
+function change_stat_count(::NodeOSumTerm, net, weights, i::Int, j::Int,
+                           old::Int, new::Int)
+    is_directed(net) || return 0.0
+    # Out-strength of i excluding the dyad's own contribution
+    s = _out_strength(net, weights, i) - dyad_value(net, weights, i, j)
+    return (s + new)^2 - (s + old)^2
+end
+
 """
     NodeISumTerm <: AbstractERGMTerm
 
-Sum of incoming edge values by node: measures popularity heterogeneity.
+Sum of squared in-strengths: measures popularity heterogeneity.
+Directed networks only (0 for undirected; use `NodeSumTerm` there).
 """
 struct NodeISumTerm <: AbstractERGMTerm end
 
 name(::NodeISumTerm) = "nodeISum"
 
 function compute(::NodeISumTerm, net)
-    weights = get_edge_attribute(net, :weight)
+    is_directed(net) || return 0.0
+    weights = _get_weights(net)
     n = nv(net)
     in_strength = zeros(n)
 
     for e in edges(net)
-        w = isnothing(weights) ? 1 : get(weights, (src(e), dst(e)), 1)
+        w = get(weights, _wkey(net, src(e), dst(e)), 1)
         in_strength[dst(e)] += w
     end
 
     return sum(in_strength .^ 2)
 end
 
+function change_stat_count(::NodeISumTerm, net, weights, i::Int, j::Int,
+                           old::Int, new::Int)
+    is_directed(net) || return 0.0
+    s = _in_strength(net, weights, j) - dyad_value(net, weights, i, j)
+    return (s + new)^2 - (s + old)^2
+end
+
 """
     NodeSumTerm <: AbstractERGMTerm
 
-Sum of total (in + out) edge values by node (for undirected or combined).
+Sum of squared total (in + out) strengths.
 """
 struct NodeSumTerm <: AbstractERGMTerm end
 
 name(::NodeSumTerm) = "nodeSum"
 
 function compute(::NodeSumTerm, net)
-    weights = get_edge_attribute(net, :weight)
+    weights = _get_weights(net)
     n = nv(net)
     strength = zeros(n)
 
     for e in edges(net)
-        w = isnothing(weights) ? 1 : get(weights, (src(e), dst(e)), 1)
+        w = get(weights, _wkey(net, src(e), dst(e)), 1)
         strength[src(e)] += w
         strength[dst(e)] += w
     end
 
     return sum(strength .^ 2)
+end
+
+function change_stat_count(::NodeSumTerm, net, weights, i::Int, j::Int,
+                           old::Int, new::Int)
+    y_ij = dyad_value(net, weights, i, j)
+    # Total strength of a vertex, excluding the (i,j) dyad's contribution.
+    # For undirected networks the stored edge contributes to both
+    # endpoints once via compute's src/dst accumulation.
+    if is_directed(net)
+        s_i = _out_strength(net, weights, i) + _in_strength(net, weights, i) - y_ij
+        s_j = _out_strength(net, weights, j) + _in_strength(net, weights, j) - y_ij
+    else
+        # Undirected: strength via unique edges
+        s_i = _out_strength(net, weights, i) - y_ij
+        s_j = _out_strength(net, weights, j) - y_ij
+    end
+    d_old, d_new = Float64(old), Float64(new)
+    return (s_i + d_new)^2 - (s_i + d_old)^2 + (s_j + d_new)^2 - (s_j + d_old)^2
 end
 
 # =============================================================================
@@ -442,6 +585,9 @@ end
     CountERGMResult
 
 Results from fitting a count ERGM.
+
+`loglik` is the maximized *pseudo*-log-likelihood over the (possibly
+truncated) dyad support.
 """
 struct CountERGMResult{T}
     model::CountERGMModel{T}
@@ -449,13 +595,14 @@ struct CountERGMResult{T}
     std_errors::Vector{Float64}
     loglik::Float64
     converged::Bool
+    max_val::Int
 end
 
 function Base.show(io::IO, result::CountERGMResult)
     println(io, "Count ERGM Results")
     println(io, "==================")
     println(io, "Reference: $(typeof(result.model.reference))")
-    println(io, "Log-likelihood: $(round(result.loglik, digits=4))")
+    println(io, "Pseudo-log-likelihood: $(round(result.loglik, digits=4))")
     println(io, "Converged: $(result.converged)")
     println(io)
     println(io, "Coefficients:")
@@ -468,12 +615,18 @@ end
 """
     ergm_count(net::Network, terms; reference=PoissonReference(), kwargs...)
 
-Fit an ERGM for count-valued networks.
+Fit an ERGM for count-valued networks by maximum pseudo-likelihood: each
+dyad's conditional distribution over the count support
+`P(y_ij = y | rest) ∝ h(y)·exp(θ'Δg(y))` is used as an independent
+likelihood contribution. The reference measure `h` enters the estimator
+directly.
 
 # Arguments
-- `net`: Network with edge weights
+- `net`: Network with `:weight` edge attribute (unweighted edges count as 1)
 - `terms`: Vector of ERGM terms
 - `reference`: Reference measure (default: Poisson)
+- `max_val::Int`: Truncation of unbounded supports (default: twice the
+  maximum observed count, at least 10)
 
 # Returns
 - `CountERGMResult`: Fitted model results
@@ -481,76 +634,157 @@ Fit an ERGM for count-valued networks.
 function ergm_count(net::Network{T}, terms::Vector{<:AbstractERGMTerm};
                     reference::AbstractReferenceMeasure=PoissonReference(),
                     method::Symbol=:mple,
-                    maxiter::Int=100) where T
+                    maxiter::Int=100,
+                    tol::Float64=1e-8,
+                    max_val::Union{Int,Nothing}=nothing) where T
 
-    model = CountERGMModel{T}(terms, net, reference, is_directed(net))
+    model = CountERGMModel{T}(collect(AbstractERGMTerm, terms), net,
+                              reference, is_directed(net))
 
     if method == :mple
-        return count_mple(model; maxiter=maxiter)
+        return count_mple(model; maxiter=maxiter, tol=tol, max_val=max_val)
     else
         throw(ArgumentError("Unknown method: $method"))
     end
 end
 
-fit_count_ergm = ergm_count
+const fit_count_ergm = ergm_count
+
+# All dyads of the network as (i, j) pairs
+function _dyads(net)
+    n = nv(net)
+    if is_directed(net)
+        return [(i, j) for i in 1:n for j in 1:n if i != j]
+    else
+        return [(i, j) for i in 1:n for j in (i+1):n]
+    end
+end
+
+function _default_max_val(net, weights)
+    m = 0
+    for e in edges(net)
+        m = max(m, Int(get(weights, _wkey(net, src(e), dst(e)), 1)))
+    end
+    return max(10, 2 * m)
+end
 
 """
     count_mple(model::CountERGMModel; kwargs...) -> CountERGMResult
 
-Maximum Pseudo-Likelihood Estimation for count ERGM.
+Maximum pseudo-likelihood estimation for count ERGMs. For each dyad the
+full conditional over the count support is enumerated, so the score is
+`Σ_dyads [Δg(y_obs) − E_θ(Δg)]` and the Hessian is `−Σ_dyads Var_θ(Δg)`.
 """
-function count_mple(model::CountERGMModel{T}; maxiter::Int=100, tol::Float64=1e-6) where T
-    n_terms = length(model.terms)
-    n = nv(model.network)
-    coef = zeros(n_terms)
+function count_mple(model::CountERGMModel{T}; maxiter::Int=100,
+                    tol::Float64=1e-8,
+                    max_val::Union{Int,Nothing}=nothing) where T
+    net = model.network
+    terms = model.terms
+    ref = model.reference
+    n_terms = length(terms)
+    weights = _get_weights(net)
 
-    # Compute observed statistics
-    obs_stats = [compute(term, model.network) for term in model.terms]
+    mv = isnothing(max_val) ? _default_max_val(net, weights) : max_val
+    support = _support(ref, mv)
+    y0 = first(support)
 
-    # Newton-Raphson optimization
-    for iter in 1:maxiter
-        grad = zeros(n_terms)
-        hess = zeros(n_terms, n_terms)
+    dyads = _dyads(net)
+    n_dyads = length(dyads)
 
-        for i in 1:n
-            for j in (model.directed ? (1:n) : (i+1:n))
-                i == j && continue
+    # Precompute, per dyad: observed value index and the change-stat matrix
+    # Δg(y0 → y) for every support value (terms × support)
+    log_h = [log_reference(ref, y) for y in support]
+    X = Array{Float64}(undef, n_terms, length(support), n_dyads)
+    y_obs_idx = Vector{Int}(undef, n_dyads)
 
-                # Current edge value
-                weights = get_edge_attribute(model.network, :weight)
-                y_obs = if !isnothing(weights)
-                    get(weights, (i, j), 0)
-                else
-                    has_edge(model.network, i, j) ? 1 : 0
-                end
-
-                # Compute expected statistics under current parameters
-                # For MPLE, we approximate by conditioning on rest of network
-                # This is a simplified version
-
-                delta = [change_stat(term, model.network, i, j) for term in model.terms]
-                eta = dot(coef, delta)
-                prob = 1.0 / (1.0 + exp(-eta))
-
-                grad .+= delta .* (y_obs > 0 ? 1.0 : 0.0 - prob)
-                hess .-= (prob * (1 - prob)) .* (delta * delta')
-            end
+    for (d, (i, j)) in enumerate(dyads)
+        y_obs = dyad_value(net, weights, i, j)
+        if y_obs > last(support) || y_obs < y0
+            throw(ArgumentError(
+                "Observed count $y_obs at dyad ($i,$j) outside the support " *
+                "$(support); increase max_val"))
         end
-
-        # Update
-        if det(hess) != 0 && !any(isnan, hess)
-            step = -hess \ grad
-            coef .+= step
-
-            if maximum(abs.(step)) < tol
-                se = sqrt.(abs.(diag(pinv(-hess))))
-                return CountERGMResult{T}(model, coef, se, NaN, true)
+        y_obs_idx[d] = y_obs - y0 + 1
+        for (s, y) in enumerate(support)
+            for (k, term) in enumerate(terms)
+                X[k, s, d] = change_stat_count(term, net, weights, i, j, y0, y)
             end
         end
     end
 
-    se = fill(NaN, n_terms)
-    return CountERGMResult{T}(model, coef, se, NaN, false)
+    coef = zeros(n_terms)
+    ll = -Inf
+    converged = false
+
+    # Pseudo-log-likelihood, gradient, Hessian at β
+    function derivatives(β)
+        llv = 0.0
+        grad = zeros(n_terms)
+        hess = zeros(n_terms, n_terms)
+        η = Vector{Float64}(undef, length(support))
+        for d in 1:n_dyads
+            Xd = @view X[:, :, d]
+            for s in eachindex(support)
+                η[s] = log_h[s] + dot(β, @view Xd[:, s])
+            end
+            ηmax = maximum(η)
+            Z = 0.0
+            for s in eachindex(support)
+                Z += exp(η[s] - ηmax)
+            end
+            logZ = ηmax + log(Z)
+            llv += η[y_obs_idx[d]] - logZ
+
+            # E[Δg] and E[Δg Δg'] under the conditional
+            eX = zeros(n_terms)
+            eXX = zeros(n_terms, n_terms)
+            for s in eachindex(support)
+                p = exp(η[s] - logZ)
+                x = @view Xd[:, s]
+                eX .+= p .* x
+                eXX .+= p .* (x * x')
+            end
+            grad .+= (@view Xd[:, y_obs_idx[d]]) .- eX
+            hess .-= eXX .- eX * eX'
+        end
+        return llv, grad, hess
+    end
+
+    ll, grad, hess = derivatives(coef)
+
+    for _ in 1:maxiter
+        step = try
+            -hess \ grad
+        catch
+            break
+        end
+
+        # Step-halving to guarantee ascent
+        stepsize = 1.0
+        ll_new, grad_new, hess_new = ll, grad, hess
+        for _ in 1:10
+            ll_new, grad_new, hess_new = derivatives(coef .+ stepsize .* step)
+            ll_new >= ll && break
+            stepsize /= 2
+        end
+
+        coef .+= stepsize .* step
+        ll_change = abs(ll_new - ll)
+        ll, grad, hess = ll_new, grad_new, hess_new
+
+        if ll_change < tol && norm(grad) < sqrt(tol)
+            converged = true
+            break
+        end
+    end
+
+    se = try
+        sqrt.(abs.(diag(pinv(-hess))))
+    catch
+        fill(NaN, n_terms)
+    end
+
+    return CountERGMResult{T}(model, coef, se, ll, converged, last(support))
 end
 
 # =============================================================================
@@ -560,60 +794,95 @@ end
 """
     simulate_count_ergm(result::CountERGMResult; n_sim=1, kwargs...) -> Vector{Network}
 
-Simulate networks from a fitted count ERGM.
+Simulate networks from a fitted count ERGM by Gibbs sampling: each dyad is
+resampled from its full conditional
+`P(y_ij = y | rest) ∝ h(y)·exp(θ'Δg(y))`, using each term's proper change
+statistic, so structural terms (mutuality, transitivity, node strength)
+influence the draws.
 """
 function simulate_count_ergm(result::CountERGMResult{T};
                              n_sim::Int=1,
-                             burnin::Int=1000,
-                             interval::Int=100,
+                             burnin::Int=100,
+                             interval::Int=10,
+                             max_val::Union{Int,Nothing}=nothing) where T
+    model = result.model
+    mv = isnothing(max_val) ? result.max_val : max_val
+    return _simulate_count(model.network, model.terms, model.reference,
+                           result.coefficients; n_sim=n_sim, burnin=burnin,
+                           interval=interval, max_val=mv)
+end
+
+"""
+    simulate_count_ergm(net, terms, coefficients; reference=PoissonReference(), kwargs...)
+
+Simulate count networks from an ERGM specification (without fitting).
+`net` provides the size, directedness, and starting state.
+"""
+function simulate_count_ergm(net::Network{T}, terms::Vector{<:AbstractERGMTerm},
+                             coefficients::Vector{Float64};
+                             reference::AbstractReferenceMeasure=PoissonReference(),
+                             n_sim::Int=1,
+                             burnin::Int=100,
+                             interval::Int=10,
                              max_val::Int=20) where T
+    return _simulate_count(net, collect(AbstractERGMTerm, terms), reference,
+                           coefficients; n_sim=n_sim, burnin=burnin,
+                           interval=interval, max_val=max_val)
+end
+
+function _simulate_count(net0::Network{T}, terms::Vector{AbstractERGMTerm},
+                         ref::AbstractReferenceMeasure,
+                         coefficients::Vector{Float64};
+                         n_sim::Int, burnin::Int, interval::Int,
+                         max_val::Int) where T
     networks = Network{T}[]
 
-    current = deepcopy(result.model.network)
+    current = deepcopy(net0)
     n = nv(current)
     directed = is_directed(current)
+    support = _support(ref, max_val)
+    log_h = [log_reference(ref, y) for y in support]
+    log_probs = Vector{Float64}(undef, length(support))
 
-    for sim in 1:(burnin + n_sim * interval)
-        # Gibbs sampling: update each edge
+    # One Gibbs sweep updates every dyad once
+    for sweep in 1:(burnin + n_sim * interval)
+        weights = _get_weights(current)
         for i in 1:n
             for j in (directed ? (1:n) : (i+1:n))
                 i == j && continue
 
-                # Sample new value for edge (i,j)
-                # Compute conditional distribution
-                log_probs = Float64[]
-                for y in 0:max_val
-                    # Temporarily set edge to value y
-                    log_p = log_reference(result.model.reference, y)
-                    for (k, term) in enumerate(result.model.terms)
-                        # This is approximate - would need proper change stat
-                        log_p += result.coefficients[k] * y
+                old = dyad_value(current, weights, i, j)
+
+                for (s, y) in enumerate(support)
+                    lp = log_h[s]
+                    for (k, term) in enumerate(terms)
+                        lp += coefficients[k] *
+                              change_stat_count(term, current, weights, i, j, old, y)
                     end
-                    push!(log_probs, log_p)
+                    log_probs[s] = lp
                 end
 
-                # Normalize and sample
                 log_probs .-= maximum(log_probs)
                 probs = exp.(log_probs)
                 probs ./= sum(probs)
 
-                new_val = sample(0:max_val, Weights(probs))
+                new_val = support[sample(eachindex(support), Weights(probs))]
 
-                # Update network
+                # Update network and weight dictionary in place
                 if new_val > 0
                     if !has_edge(current, i, j)
                         add_edge!(current, i, j)
                     end
-                    set_edge_attribute!(current, i, j, :weight, new_val)
-                else
-                    if has_edge(current, i, j)
-                        rem_edge!(current, i, j)
-                    end
+                    set_edge_attribute!(current, :weight, i, j, new_val)
+                    weights = _get_weights(current)
+                elseif old > 0
+                    rem_edge!(current, i, j)
+                    weights = _get_weights(current)
                 end
             end
         end
 
-        if sim > burnin && (sim - burnin) % interval == 0
+        if sweep > burnin && (sweep - burnin) % interval == 0
             push!(networks, deepcopy(current))
         end
     end

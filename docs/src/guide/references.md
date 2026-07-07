@@ -60,7 +60,7 @@ ref = PoissonReference(0.5)
 **Log-reference computation**:
 
 ```julia
-log_reference(ref::PoissonReference, y) = y * log(ref.lambda) - logfactorial(y)
+log_reference(ref::PoissonReference, y) = y * log(ref.lambda) - log(factorial(y))
 ```
 
 ### GeometricReference
@@ -68,20 +68,22 @@ log_reference(ref::PoissonReference, y) = y * log(ref.lambda) - logfactorial(y)
 The Geometric reference is useful for over-dispersed count data.
 
 ```julia
-GeometricReference(prob::Float64=0.5)
+GeometricReference()
 ```
 
-**Reference function**:
+**Reference function** (the counting measure, as in `ergm.count`/Krivitsky 2012):
 
-$$h(y_{ij}) = (1 - p)^{y_{ij}}$$
+$$h(y_{ij}) = 1$$
 
 **Support**: $y_{ij} \in \{0, 1, 2, \ldots\}$ (unbounded)
 
 **Properties**:
-- Unbounded support like Poisson
-- Has heavier tails than Poisson -- allows more extreme values
-- The parameter $p$ controls the decay rate of probabilities
-- Smaller $p$ means heavier tails
+- Unbounded support like Poisson, but heavier (geometric) tails
+- The geometric *shape* of the dyad distribution comes from a **negative
+  `SumTerm` coefficient**, not from a reference parameter: with coefficient
+  θ < 0 each dyad is conditionally geometric with success probability
+  1 − e^θ
+- The reference itself has no free parameter
 
 **When to use**:
 - Edge values show more variance than a Poisson would predict
@@ -89,14 +91,7 @@ $$h(y_{ij}) = (1 - p)^{y_{ij}}$$
 - Heavy-tailed distributions are expected
 
 ```julia
-# Default: prob = 0.5
 ref = GeometricReference()
-
-# Heavier tails (more high-count edges)
-ref = GeometricReference(0.2)
-
-# Lighter tails
-ref = GeometricReference(0.8)
 ```
 
 ### BinomialReference
@@ -104,20 +99,21 @@ ref = GeometricReference(0.8)
 The Binomial reference is appropriate when edge values have a known upper bound.
 
 ```julia
-BinomialReference(n::Int, prob::Float64=0.5)
+BinomialReference(trials::Int)
 ```
 
-**Reference function**:
+**Reference function** (matching `ergm.count`'s `Binomial(trials)`):
 
-$$h(y_{ij}) = \binom{n}{y_{ij}} p^{y_{ij}} (1-p)^{n-y_{ij}}$$
+$$h(y_{ij}) = \binom{n}{y_{ij}}$$
 
 **Support**: $y_{ij} \in \{0, 1, \ldots, n\}$ (bounded)
 
 **Properties**:
-- Bounded support -- edge values cannot exceed $n$
+- Bounded support -- edge values cannot exceed the number of trials $n$
 - Natural when each edge represents "successes out of trials"
-- The parameter $n$ is the number of trials (maximum edge value)
-- The parameter $p$ is the baseline success probability
+- The baseline success probability is *absorbed into the estimated
+  `SumTerm` coefficient* rather than parameterizing the reference: with
+  coefficient θ each dyad is conditionally Binomial(n, logistic(θ))
 
 **When to use**:
 - Edge values have a natural upper bound
@@ -125,11 +121,11 @@ $$h(y_{ij}) = \binom{n}{y_{ij}} p^{y_{ij}} (1-p)^{n-y_{ij}}$$
 - Examples: meetings out of possible workdays, co-occurrences in fixed-size groups
 
 ```julia
-# 10 possible meetings, baseline 50% attendance
-ref = BinomialReference(10, 0.5)
+# 10 possible meetings
+ref = BinomialReference(10)
 
-# 5 weekdays, low baseline
-ref = BinomialReference(5, 0.2)
+# 5 weekdays
+ref = BinomialReference(5)
 ```
 
 ### DiscUnifReference
@@ -236,7 +232,7 @@ terms = [SumTerm(), NonzeroTerm(), CountMutualTerm()]
 
 refs = [
     ("Poisson(1.0)", PoissonReference(1.0)),
-    ("Geometric(0.5)", GeometricReference(0.5)),
+    ("Geometric", GeometricReference()),
     ("DiscUnif(10)", DiscUnifReference(10)),
 ]
 
@@ -256,8 +252,8 @@ Each reference measure supports random sampling, which is used in Gibbs simulati
 ```julia
 # Draw a random value from the reference
 sample_reference(PoissonReference(2.0))    # Random Poisson(2) draw
-sample_reference(GeometricReference(0.3))  # Random Geometric(0.3) draw
-sample_reference(BinomialReference(10, 0.5)) # Random Binomial(10, 0.5) draw
+sample_reference(GeometricReference())     # Random geometric-shaped draw
+sample_reference(BinomialReference(10))    # Random Binomial(10, 0.5) draw
 ```
 
 ## Log-Reference Values
@@ -267,8 +263,8 @@ For numerical stability, ERGMCount.jl works with log-reference values internally
 ```julia
 # Log-probability under reference
 log_reference(PoissonReference(1.0), 3)     # log(1^3 / 3!)
-log_reference(GeometricReference(0.5), 3)   # 3 * log(0.5)
-log_reference(BinomialReference(10, 0.5), 3) # log(C(10,3) * 0.5^10)
+log_reference(GeometricReference(), 3)     # 0.0 (counting measure)
+log_reference(BinomialReference(10), 3)     # log(C(10,3))
 ```
 
 ## Mathematical Details
