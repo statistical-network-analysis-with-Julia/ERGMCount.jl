@@ -8,7 +8,9 @@ Install ERGMCount.jl from GitHub:
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/Statistical-network-analysis-with-Julia/ERGMCount.jl")
+Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/Network.jl")
+Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/ERGM.jl")
+Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/ERGMCount.jl")
 ```
 
 ERGMCount.jl depends on Network.jl and ERGM.jl, which will be installed automatically.
@@ -31,20 +33,20 @@ using Network
 using ERGMCount
 
 # Create a directed network with 10 nodes
-net = Network{Int}(; n=10, directed=true)
+net = network(10; directed=true)
 
 # Add edges with integer weights
 add_edge!(net, 1, 2)
-set_edge_attribute!(net, 1, 2, :weight, 3)   # 3 interactions from 1 to 2
+set_edge_attribute!(net, :weight, 1, 2, 3)   # 3 interactions from 1 to 2
 
 add_edge!(net, 2, 1)
-set_edge_attribute!(net, 2, 1, :weight, 1)   # 1 interaction from 2 to 1
+set_edge_attribute!(net, :weight, 2, 1, 1)   # 1 interaction from 2 to 1
 
 add_edge!(net, 1, 3)
-set_edge_attribute!(net, 1, 3, :weight, 5)   # 5 interactions from 1 to 3
+set_edge_attribute!(net, :weight, 1, 3, 5)   # 5 interactions from 1 to 3
 
 add_edge!(net, 3, 2)
-set_edge_attribute!(net, 3, 2, :weight, 2)   # 2 interactions from 3 to 2
+set_edge_attribute!(net, :weight, 3, 2, 2)   # 2 interactions from 3 to 2
 ```
 
 ### Creating from a Matrix
@@ -59,12 +61,12 @@ W = [0 3 5 0;
      3 0 1 0]
 
 n = size(W, 1)
-net = Network{Int}(; n=n, directed=true)
+net = network(n; directed=true)
 
 for i in 1:n, j in 1:n
     if W[i, j] > 0
         add_edge!(net, i, j)
-        set_edge_attribute!(net, i, j, :weight, W[i, j])
+        set_edge_attribute!(net, :weight, i, j, W[i, j])
     end
 end
 ```
@@ -224,12 +226,14 @@ Coefficients in count ERGMs relate to the conditional distribution of each edge 
 using Network
 using ERGMCount
 using Random
+using ERGM: compute, name   # generic term interface shared with ERGM.jl
+using Statistics: mean
 
 Random.seed!(42)
 
 # Create a count-valued communication network
 n = 15
-net = Network{Int}(; n=n, directed=true)
+net = network(n; directed=true)
 
 # Simulate edge weights with some structure
 for i in 1:n, j in 1:n
@@ -238,7 +242,7 @@ for i in 1:n, j in 1:n
     rate = rand() < 0.3 ? rand(1:8) : 0
     if rate > 0
         add_edge!(net, i, j)
-        set_edge_attribute!(net, i, j, :weight, rate)
+        set_edge_attribute!(net, :weight, i, j, rate)
     end
 end
 

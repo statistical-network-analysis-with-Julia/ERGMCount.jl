@@ -6,9 +6,10 @@ Count terms are sufficient statistics computed from the valued adjacency matrix.
 
 All count terms are subtypes of `AbstractERGMTerm` and implement:
 
+<!-- skip-check -->
 ```julia
 compute(term, net) -> Float64       # Full network statistic
-change_stat(term, net, i, j, ...) -> Float64  # Change when edge value changes
+change_stat_count(term, net, weights, i, j, old, new) -> Float64  # Change when dyad (i,j) moves from count `old` to `new`
 name(term) -> String                 # Human-readable name
 ```
 
@@ -18,6 +19,7 @@ name(term) -> String                 # Human-readable name
 
 The most fundamental count term -- the sum of all edge values.
 
+<!-- skip-check -->
 ```julia
 SumTerm()
 ```
@@ -41,12 +43,13 @@ $$\Delta g = \delta$$
 
 ```julia
 using Network, ERGMCount
+using ERGM: compute, name   # generic term interface shared with ERGM.jl
 
-net = Network{Int}(; n=5, directed=true)
+net = network(5; directed=true)
 add_edge!(net, 1, 2)
-set_edge_attribute!(net, 1, 2, :weight, 3)
+set_edge_attribute!(net, :weight, 1, 2, 3)
 add_edge!(net, 2, 3)
-set_edge_attribute!(net, 2, 3, :weight, 2)
+set_edge_attribute!(net, :weight, 2, 3, 2)
 
 term = SumTerm()
 println(compute(term, net))  # 5.0 (3 + 2)
@@ -87,6 +90,7 @@ println(name(term))          # "nonzero"
 
 Counts edges with values exceeding a threshold.
 
+<!-- skip-check -->
 ```julia
 GreaterthannTerm(threshold::Int)
 ```
@@ -119,6 +123,7 @@ terms = [
 
 Counts edges with values at or above a threshold.
 
+<!-- skip-check -->
 ```julia
 CountAtleastnTerm(threshold::Int)
 ```
@@ -163,19 +168,19 @@ $$g(y) = \sum_{i < j} \min(y_{ij}, y_{ji})$$
 **Example**:
 
 ```julia
-net = Network{Int}(; n=3, directed=true)
+net = network(3; directed=true)
 
 # Dyad (1,2): 3 from 1->2, 2 from 2->1
 add_edge!(net, 1, 2)
-set_edge_attribute!(net, 1, 2, :weight, 3)
+set_edge_attribute!(net, :weight, 1, 2, 3)
 add_edge!(net, 2, 1)
-set_edge_attribute!(net, 2, 1, :weight, 2)
+set_edge_attribute!(net, :weight, 2, 1, 2)
 
 # Dyad (1,3): 1 from 1->3, 4 from 3->1
 add_edge!(net, 1, 3)
-set_edge_attribute!(net, 1, 3, :weight, 1)
+set_edge_attribute!(net, :weight, 1, 3, 1)
 add_edge!(net, 3, 1)
-set_edge_attribute!(net, 3, 1, :weight, 4)
+set_edge_attribute!(net, :weight, 3, 1, 4)
 
 term = CountMutualTerm()
 # min(3,2) + min(1,4) = 2 + 1 = 3
@@ -365,7 +370,7 @@ result = ergm_count(net, terms; reference=PoissonReference())
 You can compute any term on a network without fitting a model:
 
 ```julia
-net = Network{Int}(; n=10, directed=true)
+net = network(10; directed=true)
 # ... add edges with weights ...
 
 for term in [SumTerm(), NonzeroTerm(), CountMutualTerm()]

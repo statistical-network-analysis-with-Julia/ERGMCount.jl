@@ -1,5 +1,9 @@
 # Types API Reference
 
+```@meta
+CurrentModule = ERGMCount
+```
+
 This page documents the core data types in ERGMCount.jl.
 
 ## Reference Measures

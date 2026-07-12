@@ -1,7 +1,7 @@
 name = "ERGMCount"
 uuid = "7556d106-17e3-4d5c-b2ff-836722c37052"
-authors = ["Statistical Network Analysis with Julia"]
 version = "0.1.0"
+authors = ["Statistical Network Analysis with Julia"]
 
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -9,19 +9,24 @@ ERGM = "d623cd87-b018-4e2a-bf53-b77ebcdc9da2"
 Graphs = "86223c79-3864-5bf0-83f7-82e725a168b6"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Network = "027a387e-e55f-4537-a155-5037e5a23bdb"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+StatsAPI = "82ae8749-77ed-4fe6-ae5f-f523153014b0"
 StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"
 
 [sources]
-Network = {path = "../Network.jl"}
 ERGM = {path = "../ERGM.jl"}
+Network = {path = "../Network.jl"}
 
 [compat]
-julia = "1.12"
 Distributions = "0.25"
 ERGM = "0.1"
 Graphs = "1.9"
+LinearAlgebra = "1.12.0"
 Network = "0.1"
+Random = "1.11.0"
+StatsAPI = "1.7"
 StatsBase = "0.34"
+julia = "1.12"
 
 [extras]
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"

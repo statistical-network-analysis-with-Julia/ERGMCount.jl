@@ -1,8 +1,18 @@
 # Estimation API Reference
 
-This page documents the functions for fitting and simulating count ERGMs.
+```@meta
+CurrentModule = ERGMCount
+```
+
+This page documents the functions for fitting, simulating, and assessing count ERGMs.
 
 ## Model Fitting
+
+### fit_ergm_count
+
+```@docs
+fit_ergm_count
+```
 
 ### ergm_count
 
@@ -28,4 +38,16 @@ count_mple
 
 ```@docs
 simulate_count_ergm
+```
+
+## Goodness of Fit
+
+### gof
+
+Goodness-of-fit assessment is provided as a method of the shared
+`Network.gof` generic, so the same `gof(result)` call works across the
+model packages of the ecosystem.
+
+```@docs
+gof(::CountERGMResult)
 ```

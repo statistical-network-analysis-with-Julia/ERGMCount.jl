@@ -21,9 +21,9 @@ The entire package lives in a single file: `src/ERGMCount.jl`. It is organized i
 
 2. **Count-Specific Terms** -- Subtypes of `AbstractERGMTerm` (`import ERGM: name, compute`). Every term implements `name(t)`, `compute(t, net)`, and `change_stat_count(t, net, weights, i, j, old, new)` — the change in the statistic when dyad (i,j) moves from count `old` to `new`, holding other dyads fixed (implementations must not read the dyad's own current value). Terms: `SumTerm`, `NonzeroTerm`, `GreaterthannTerm`, `CountAtleastnTerm`, `CountMutualTerm`, `TransitiveTiesTerm`, `CyclicalTiesTerm`, `NodeOSumTerm`, `NodeISumTerm`, `NodeSumTerm` (the NodeO/ISum terms are directed-only).
 
-3. **Estimation** -- `ergm_count()` dispatches to `count_mple()`: a proper count MPLE that enumerates each dyad's full conditional P(y_ij=y|rest) ∝ h(y)·exp(θ'Δg(y)) over the (possibly truncated, `max_val`) support — the reference measure enters the estimator directly. Newton-Raphson with step-halving; `loglik` is the maximized pseudo-log-likelihood.
+3. **Estimation** -- `ergm_count()` dispatches to `count_mple()`: a proper count MPLE that enumerates each dyad's full conditional P(y_ij=y|rest) ∝ h(y)·exp(θ'Δg(y)) over the (possibly truncated, `max_val`) support — the reference measure enters the estimator directly. Maximized with the shared `ERGM.newton_fit` optimizer (Newton-Raphson with step-halving); `loglik` is the maximized pseudo-log-likelihood.
 
-4. **Simulation** -- `simulate_count_ergm()` Gibbs-samples each dyad from its full conditional using the per-term `change_stat_count`, so structural terms influence draws. Also callable with explicit `(net, terms, coefficients)` without fitting.
+4. **Simulation** -- `simulate_count_ergm()` Gibbs-samples each dyad from its full conditional using the per-term `change_stat_count`, so structural terms influence draws. Also callable with explicit `(net, terms, coefficients)` without fitting. All sampling entry points (`simulate_count_ergm`, `sample_reference`) take an `rng::AbstractRNG` keyword (default `Random.default_rng()`); the same rng state gives identical draws. The Gibbs loop snapshots the `:weight` attribute once into a typed `Dict{Tuple{T,T},Int}` (Network.jl's typed `get_edge_attribute(net, :weight, Int)` accessor) and maintains it incrementally alongside the network — the untyped attribute Dict must not be read inside the hot loop.
 
 ## Key Dependencies
 
@@ -36,6 +36,6 @@ The entire package lives in a single file: `src/ERGMCount.jl`. It is organized i
 
 - All term structs subtype `AbstractERGMTerm` and must implement `name()` and `compute()`.
 - Edge weights are stored as the `:weight` edge attribute on `Network` objects; absent weight means binary (0/1).
-- The `ergm_count` function is the public API; `fit_count_ergm` is an alias.
+- `fit_ergm_count` is the standardized entry point (ecosystem `fit_<model>` naming); `ergm_count` is the R-faithful alias and `fit_count_ergm` a legacy alias — all the same function.
 - Julia >= 1.12 is required (see `[compat]` in Project.toml).
 - Tests in `test/runtests.jl` include brute-force verification of every `change_stat_count`, hand-computed term values, Poisson-rate recovery of the MPLE, and estimation↔simulation round trips.

@@ -6,8 +6,8 @@ Network = "027a387e-e55f-4537-a155-5037e5a23bdb"
 
 [sources]
 ERGMCount = {path = ".."}
-ERGM = {url = "https://github.com/statistical-network-analysis-with-Julia/ERGM.jl.git"}
-Network = {url = "https://github.com/statistical-network-analysis-with-Julia/Network.jl.git"}
+ERGM = {path = "../../ERGM.jl"}
+Network = {path = "../../Network.jl"}
 
 [compat]
 Documenter = "1"

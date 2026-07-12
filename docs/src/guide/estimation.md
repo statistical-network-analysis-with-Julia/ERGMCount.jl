@@ -28,9 +28,30 @@ $$P(Y_{ij} = y \mid Y_{-ij}; \theta) \propto h(y) \exp\left(\theta^\top \Delta g
 
 Where $\Delta g_{ij}(y)$ is the vector of change statistics when $y_{ij}$ takes value $y$.
 
-MPLE maximizes the log-pseudo-likelihood using Newton-Raphson iteration.
+MPLE maximizes the log-pseudo-likelihood with ERGM.jl's shared `newton_fit`
+optimizer (Newton-Raphson with step-halving).
 
 ## Fitting a Model
+
+The examples below assume the packages are loaded and a small count-valued
+network exists:
+
+```julia
+using Network, ERGMCount
+using ERGM: compute, name   # generic term interface shared with ERGM.jl
+using Statistics: mean, std
+using Random
+
+rng = Xoshiro(1)
+net = network(12; directed=true)
+for i in 1:12, j in 1:12
+    if i != j && rand(rng) < 0.2
+        add_edge!(net, i, j)
+        set_edge_attribute!(net, :weight, i, j, rand(rng, 1:5))
+    end
+end
+terms = [SumTerm(), NonzeroTerm(), CountMutualTerm()]
+```
 
 ### Basic Usage
 
@@ -58,10 +79,13 @@ result = ergm_count(net, terms;
 
 ### Alternative Syntax
 
-The `fit_count_ergm` function is an alias for `ergm_count`:
+`fit_ergm_count` is the standardized entry point (the ecosystem's
+`fit_<model>` naming); `ergm_count` is the R-faithful alias of the same
+function, and `fit_count_ergm` is kept for backward compatibility:
 
 ```julia
-# These are equivalent
+# These are all the same function
+result = fit_ergm_count(net, terms; reference=PoissonReference())
 result = ergm_count(net, terms; reference=PoissonReference())
 result = fit_count_ergm(net, terms; reference=PoissonReference())
 ```
@@ -90,14 +114,19 @@ Output:
 Count ERGM Results
 ==================
 Reference: PoissonReference
-Log-likelihood: -123.4567
+Pseudo-log-likelihood: -115.8798
 Converged: true
 
-Coefficients:
-  sum                     0.1234 (SE: 0.0456)
-  nonzero                -1.5678 (SE: 0.3210)
-  mutual.count            0.4567 (SE: 0.1234)
+              Estimate  Std.Error  z value  Pr(>|z|)
+sum             1.0536     0.1224   8.6097    <1e-16 ***
+nonzero        -4.2435     0.4272  -9.9321    <1e-16 ***
+mutual.count    0.2182     0.1729   1.2618    0.2070
+---
+Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
+
+(The coefficient table is the shared presentation layer from Network.jl,
+used identically across the ecosystem's model packages.)
 
 ### Accessing Results
 
@@ -217,11 +246,13 @@ println("Geometric: ", round.(result_geom.coefficients, digits=3))
 After fitting, validate by simulating networks from the estimated model and comparing summary statistics:
 
 ```julia
-# Simulate from fitted model
+# Simulate from fitted model (pass rng for reproducible draws)
+using Random
 sim_nets = simulate_count_ergm(result;
     n_sim=100,
     burnin=1000,
-    max_val=20
+    max_val=20,
+    rng=Xoshiro(42)
 )
 
 # Compare observed vs simulated

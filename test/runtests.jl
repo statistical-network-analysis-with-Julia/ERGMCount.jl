@@ -208,6 +208,37 @@ const ALL_TERMS = [SumTerm(), NonzeroTerm(), GreaterthannTerm(2),
         @test mut_pos > mut_zero
     end
 
+    @testset "rng keyword gives reproducible draws" begin
+        seed_net = network(6)
+        sim = rng -> simulate_count_ergm(seed_net, [SumTerm(), CountMutualTerm()],
+                                         [log(1.5), 0.5];
+                                         reference=PoissonReference(1.0),
+                                         n_sim=3, burnin=10, interval=2,
+                                         max_val=10, rng=rng)
+        sims1 = sim(Random.Xoshiro(99))
+        sims2 = sim(Random.Xoshiro(99))
+        @test [compute(SumTerm(), s) for s in sims1] ==
+              [compute(SumTerm(), s) for s in sims2]
+        @test all(get_edge_attribute(a, :weight) == get_edge_attribute(b, :weight)
+                  for (a, b) in zip(sims1, sims2))
+
+        # The fitted-result method accepts rng too
+        net = random_count_net(6; seed=17)
+        result = ergm_count(net, [SumTerm()])
+        r1 = simulate_count_ergm(result; n_sim=2, burnin=5, interval=2,
+                                 rng=Random.Xoshiro(4))
+        r2 = simulate_count_ergm(result; n_sim=2, burnin=5, interval=2,
+                                 rng=Random.Xoshiro(4))
+        @test [compute(SumTerm(), s) for s in r1] ==
+              [compute(SumTerm(), s) for s in r2]
+
+        # sample_reference draws flow through the rng keyword
+        @test sample_reference(PoissonReference(2.0); rng=Random.Xoshiro(3)) ==
+              sample_reference(PoissonReference(2.0); rng=Random.Xoshiro(3))
+        @test sample_reference(DiscUnif2Reference(1, 5); rng=Random.Xoshiro(8)) ==
+              sample_reference(DiscUnif2Reference(1, 5); rng=Random.Xoshiro(8))
+    end
+
     @testset "Estimation-simulation round trip" begin
         Random.seed!(21)
         n = 8
@@ -222,12 +253,78 @@ const ALL_TERMS = [SumTerm(), NonzeroTerm(), GreaterthannTerm(2),
         @test result.coefficients[1] ≈ θ_true atol = 0.35
     end
 
+    @testset "StatsAPI accessors" begin
+        net = random_count_net(6; seed=11)
+        result = ergm_count(net, [SumTerm(), NonzeroTerm()])
+        @test coef(result) == result.coefficients
+        @test stderror(result) == result.std_errors
+        @test vcov(result) == result.vcov
+        @test size(vcov(result)) == (2, 2)
+        @test all(stderror(result) .≈
+                  sqrt.(abs.([vcov(result)[k, k] for k in 1:2])))
+        @test loglikelihood(result) == result.loglik
+        @test nobs(result) == 6 * 5  # directed dyads
+        @test dof(result) == 2
+    end
+
+    @testset "compute is invariant under Base.copy(::Network)" begin
+        # Base.copy preserves edge attributes, so every count statistic
+        # must agree between a network and its copy
+        for directed in (true, false)
+            net = random_count_net(6; directed=directed, seed=5)
+            for term in ALL_TERMS
+                @test compute(term, copy(net)) == compute(term, net)
+            end
+        end
+    end
+
     @testset "fit alias and API" begin
         @test fit_count_ergm === ergm_count
+        @test fit_ergm_count === ergm_count
         net = random_count_net(5; seed=13)
         @test_throws ArgumentError ergm_count(net, [SumTerm()]; method=:mcmc)
         # Observed count outside a bounded support errors clearly
         @test_throws ArgumentError ergm_count(net, [SumTerm()];
                                               reference=DiscUnifReference(1))
+    end
+
+    @testset "show renders the shared coefficient table" begin
+        net = random_count_net(6; seed=11)
+        result = fit_ergm_count(net, [SumTerm(), NonzeroTerm()])
+        out = sprint(show, result)
+        @test occursin("Count ERGM Results", out)
+        @test occursin("Estimate", out)
+        @test occursin("Pr(>|z|)", out)
+        @test occursin("Signif. codes", out)
+        @test occursin("sum", out)
+        @test occursin("nonzero", out)
+    end
+
+    @testset "gof extends the shared Network.gof generic" begin
+        # One generic across the ecosystem: the method is added to
+        # Network.gof, not a package-local function
+        @test ERGMCount.gof === Network.gof
+
+        net = random_count_net(6; seed=19)
+        result = fit_ergm_count(net, [SumTerm(), NonzeroTerm()])
+        g = ERGMCount.gof(result; n_sim=8, burnin=10, interval=2,
+                          rng=Random.Xoshiro(31))
+        @test g isa Network.GOFResult
+        @test Network.n_simulations(g) == 8
+        @test length(g.statistics) == 2
+        @test g.statistics[1].name == "model statistics"
+        @test g.statistics[1].labels == ["sum", "nonzero"]
+        @test g.statistics[1].observed ==
+              [compute(SumTerm(), net), compute(NonzeroTerm(), net)]
+        @test g.statistics[2].name == "dyad count values"
+        # Dyad-value counts sum to the number of dyads in every row
+        n_dyads = 6 * 5
+        @test sum(g.statistics[2].observed) == n_dyads
+        @test all(sum(g.statistics[2].simulated, dims=2) .== n_dyads)
+        @test all(p -> 0 < p <= 1, g.statistics[1].p_values)
+        # Formatted display renders the shared GOF table
+        out = sprint(show, g)
+        @test occursin("Goodness-of-fit assessment: Count ERGM", out)
+        @test occursin("MC p-value", out)
     end
 end

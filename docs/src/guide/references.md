@@ -25,6 +25,7 @@ The choice of reference measure affects:
 
 The Poisson reference measure is the most common choice for count-valued networks.
 
+<!-- skip-check -->
 ```julia
 PoissonReference(lambda::Float64=1.0)
 ```
@@ -47,6 +48,8 @@ $$h(y_{ij}) = \frac{\lambda^{y_{ij}}}{y_{ij}!}$$
 - Moderate variance (mean approximately equals variance)
 
 ```julia
+using ERGMCount
+
 # Default: lambda = 1.0
 ref = PoissonReference()
 
@@ -57,8 +60,9 @@ ref = PoissonReference(2.0)
 ref = PoissonReference(0.5)
 ```
 
-**Log-reference computation**:
+**Log-reference computation** (the internal definition, for reference):
 
+<!-- skip-check -->
 ```julia
 log_reference(ref::PoissonReference, y) = y * log(ref.lambda) - log(factorial(y))
 ```
@@ -98,6 +102,7 @@ ref = GeometricReference()
 
 The Binomial reference is appropriate when edge values have a known upper bound.
 
+<!-- skip-check -->
 ```julia
 BinomialReference(trials::Int)
 ```
@@ -132,6 +137,7 @@ ref = BinomialReference(5)
 
 The Discrete Uniform reference assigns equal probability to all values in the support.
 
+<!-- skip-check -->
 ```julia
 DiscUnifReference(max::Int)
 ```
@@ -164,6 +170,7 @@ ref = DiscUnifReference(5)
 
 The range-bounded Discrete Uniform reference allows specifying both lower and upper bounds.
 
+<!-- skip-check -->
 ```julia
 DiscUnif2Reference(a::Int, b::Int)
 ```
@@ -228,6 +235,16 @@ Is the count bounded?
 When unsure which reference to use, compare results across multiple references:
 
 ```julia
+using Network, ERGMCount, Random
+
+rng = Xoshiro(1)
+net = network(10; directed=true)
+for i in 1:10, j in 1:10
+    if i != j && rand(rng) < 0.2
+        add_edge!(net, i, j)
+        set_edge_attribute!(net, :weight, i, j, rand(rng, 1:5))
+    end
+end
 terms = [SumTerm(), NonzeroTerm(), CountMutualTerm()]
 
 refs = [
@@ -254,6 +271,10 @@ Each reference measure supports random sampling, which is used in Gibbs simulati
 sample_reference(PoissonReference(2.0))    # Random Poisson(2) draw
 sample_reference(GeometricReference())     # Random geometric-shaped draw
 sample_reference(BinomialReference(10))    # Random Binomial(10, 0.5) draw
+
+# All samplers accept an rng keyword for reproducibility
+using Random
+sample_reference(PoissonReference(2.0); rng=Xoshiro(1))
 ```
 
 ## Log-Reference Values

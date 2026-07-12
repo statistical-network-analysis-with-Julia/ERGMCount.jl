@@ -60,7 +60,9 @@ Count ERGMs are widely used in:
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/Statistical-network-analysis-with-Julia/ERGMCount.jl")
+Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/Network.jl")
+Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/ERGM.jl")
+Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/ERGMCount.jl")
 ```
 
 Or for development:
@@ -77,13 +79,13 @@ using Network
 using ERGMCount
 
 # Create a network with edge weights
-net = Network{Int}(; n=10, directed=true)
+net = network(10; directed=true)
 for i in 1:10, j in 1:10
     i == j && continue
     w = rand(0:5)
     if w > 0
         add_edge!(net, i, j)
-        set_edge_attribute!(net, i, j, :weight, w)
+        set_edge_attribute!(net, :weight, i, j, w)
     end
 end
 
@@ -105,11 +107,11 @@ println(result)
 
 | Reference | Best For | Edge Support |
 |-----------|----------|--------------|
-| [`PoissonReference`](@ref) | Unbounded counts (emails, calls) | $\{0, 1, 2, \ldots\}$ |
-| [`GeometricReference`](@ref) | High-variance counts | $\{0, 1, 2, \ldots\}$ |
-| [`BinomialReference`](@ref) | Bounded counts (meetings out of $n$ days) | $\{0, 1, \ldots, n\}$ |
-| [`DiscUnifReference`](@ref) | Equal baseline probability | $\{0, 1, \ldots, \text{max}\}$ |
-| [`DiscUnif2Reference`](@ref) | Equal baseline on custom range | $\{a, a+1, \ldots, b\}$ |
+| [`PoissonReference`](@ref ERGMCount.PoissonReference) | Unbounded counts (emails, calls) | $\{0, 1, 2, \ldots\}$ |
+| [`GeometricReference`](@ref ERGMCount.GeometricReference) | High-variance counts | $\{0, 1, 2, \ldots\}$ |
+| [`BinomialReference`](@ref ERGMCount.BinomialReference) | Bounded counts (meetings out of $n$ days) | $\{0, 1, \ldots, n\}$ |
+| [`DiscUnifReference`](@ref ERGMCount.DiscUnifReference) | Equal baseline probability | $\{0, 1, \ldots, \text{max}\}$ |
+| [`DiscUnif2Reference`](@ref ERGMCount.DiscUnif2Reference) | Equal baseline on custom range | $\{a, a+1, \ldots, b\}$ |
 
 ## Documentation
 
@@ -150,6 +152,12 @@ With a Poisson reference and the `SumTerm` statistic, the count ERGM is closely 
 ### MPLE for Count ERGMs
 
 Maximum Pseudo-Likelihood Estimation conditions on the rest of the network and maximizes the product of conditional likelihoods for each dyad. This provides a computationally efficient approximation to the full MLE.
+
+## Module Reference
+
+```@docs
+ERGMCount.ERGMCount
+```
 
 ## References
 

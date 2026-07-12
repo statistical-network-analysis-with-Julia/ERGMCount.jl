@@ -19,9 +19,16 @@ using ERGM
 using Graphs
 using LinearAlgebra
 using Network
+using Random
 using StatsBase
 
 import ERGM: name, compute
+# Shared presentation infrastructure (Network.jl): the ONE `gof` generic all
+# model packages extend, plus the common coefficient-table printer and
+# GOF containers
+import Network: gof, print_coeftable, GOFStatistic, GOFResult
+import StatsAPI
+import StatsAPI: coef, stderror, vcov, loglikelihood, nobs, dof
 
 # Reference measures
 export PoissonReference, GeometricReference, BinomialReference
@@ -37,10 +44,17 @@ export change_stat_count
 
 # Model / estimation
 export CountERGMModel, CountERGMResult
-export ergm_count, fit_count_ergm
+export fit_ergm_count, ergm_count, fit_count_ergm
 
 # Simulation
 export simulate_count_ergm
+
+# Goodness of fit (method of the shared Network.jl `gof` generic)
+export gof
+
+# StatsAPI methods (re-exported so `coef(fit)` etc. work with just
+# `using ERGMCount`)
+export coef, stderror, vcov, loglikelihood, nobs, dof
 
 # =============================================================================
 # Reference Measures
@@ -56,6 +70,30 @@ abstract type AbstractReferenceMeasure end
 # log(y!) without external dependencies; exact for the modest counts used
 # in dyad supports
 _logfactorial(y::Int) = sum(log, 2:y; init=0.0)
+
+"""
+    log_reference(ref::AbstractReferenceMeasure, y::Int) -> Float64
+
+Log of the dyadwise reference measure `h(y)` evaluated at count `y`.
+Every concrete reference measure ([`PoissonReference`](@ref ERGMCount.PoissonReference),
+[`GeometricReference`](@ref ERGMCount.GeometricReference),
+[`BinomialReference`](@ref ERGMCount.BinomialReference),
+[`DiscUnifReference`](@ref ERGMCount.DiscUnifReference),
+[`DiscUnif2Reference`](@ref ERGMCount.DiscUnif2Reference)) implements a
+method; values outside a bounded support return `-Inf`.
+"""
+function log_reference end
+
+"""
+    sample_reference(ref::AbstractReferenceMeasure;
+                     rng::Random.AbstractRNG=Random.default_rng()) -> Int
+
+Draw a single random count from the baseline distribution associated with
+the reference measure `ref` (e.g. `Poisson(lambda)` for
+[`PoissonReference`](@ref ERGMCount.PoissonReference)). All randomness flows through the `rng`
+keyword, so the same rng state yields identical draws.
+"""
+function sample_reference end
 
 """
     PoissonReference
@@ -78,8 +116,9 @@ function log_reference(ref::PoissonReference, y::Int)
     return y * log(ref.lambda) - _logfactorial(y)
 end
 
-function sample_reference(ref::PoissonReference)
-    return rand(Poisson(ref.lambda))
+function sample_reference(ref::PoissonReference;
+                          rng::Random.AbstractRNG=Random.default_rng())
+    return rand(rng, Poisson(ref.lambda))
 end
 
 """
@@ -97,7 +136,9 @@ log_reference(::GeometricReference, y::Int) = 0.0
 
 # The counting measure is improper on its own; sample from the geometric
 # shape a unit negative Sum coefficient would induce
-sample_reference(::GeometricReference) = rand(Geometric(1 - exp(-1)))
+sample_reference(::GeometricReference;
+                 rng::Random.AbstractRNG=Random.default_rng()) =
+    rand(rng, Geometric(1 - exp(-1)))
 
 """
     BinomialReference
@@ -125,8 +166,9 @@ function log_reference(ref::BinomialReference, y::Int)
            _logfactorial(ref.trials - y)
 end
 
-function sample_reference(ref::BinomialReference)
-    return rand(Binomial(ref.trials, 0.5))
+function sample_reference(ref::BinomialReference;
+                          rng::Random.AbstractRNG=Random.default_rng())
+    return rand(rng, Binomial(ref.trials, 0.5))
 end
 
 """
@@ -151,8 +193,9 @@ function log_reference(ref::DiscUnifReference, y::Int)
     return -log(ref.max + 1)
 end
 
-function sample_reference(ref::DiscUnifReference)
-    return rand(0:ref.max)
+function sample_reference(ref::DiscUnifReference;
+                          rng::Random.AbstractRNG=Random.default_rng())
+    return rand(rng, 0:ref.max)
 end
 
 """
@@ -174,8 +217,9 @@ function log_reference(ref::DiscUnif2Reference, y::Int)
     return -log(ref.b - ref.a + 1)
 end
 
-function sample_reference(ref::DiscUnif2Reference)
-    return rand(ref.a:ref.b)
+function sample_reference(ref::DiscUnif2Reference;
+                          rng::Random.AbstractRNG=Random.default_rng())
+    return rand(rng, ref.a:ref.b)
 end
 
 # Dyad-value support used when enumerating conditional distributions.
@@ -222,7 +266,9 @@ _get_weights(net) = get_edge_attribute(net, :weight)
 
 Change in `compute(term, net)` when dyad (i,j) moves from count `old` to
 count `new`, holding all other dyads fixed. `weights` is the `:weight`
-edge-attribute dictionary (`get_edge_attribute(net, :weight)`).
+edge-attribute dictionary; hot loops should pass the typed snapshot
+`get_edge_attribute(net, :weight, Int)` (a `Dict{Tuple{T,T},Int}`) rather
+than the untyped `get_edge_attribute(net, :weight)` Dict.
 """
 function change_stat_count end
 
@@ -587,16 +633,23 @@ end
 Results from fitting a count ERGM.
 
 `loglik` is the maximized *pseudo*-log-likelihood over the (possibly
-truncated) dyad support.
+truncated) dyad support; `vcov` is the inverse negative Hessian of the
+pseudo-log-likelihood at the optimum.
 """
 struct CountERGMResult{T}
     model::CountERGMModel{T}
     coefficients::Vector{Float64}
     std_errors::Vector{Float64}
+    vcov::Matrix{Float64}
     loglik::Float64
     converged::Bool
     max_val::Int
 end
+
+# Two-sided normal p-values via the complementary CDF (the naive
+# 2(1 − cdf) form underflows to exactly 0 beyond |z| ≈ 8.3); NaN standard
+# errors give NaN p-values, which the shared printer renders as "NaN"
+_z_pvalues(z::AbstractVector{Float64}) = 2 .* ccdf.(Normal(), abs.(z))
 
 function Base.show(io::IO, result::CountERGMResult)
     println(io, "Count ERGM Results")
@@ -605,21 +658,39 @@ function Base.show(io::IO, result::CountERGMResult)
     println(io, "Pseudo-log-likelihood: $(round(result.loglik, digits=4))")
     println(io, "Converged: $(result.converged)")
     println(io)
-    println(io, "Coefficients:")
-    for (i, term) in enumerate(result.model.terms)
-        println(io, "  $(rpad(name(term), 20)) $(lpad(round(result.coefficients[i], digits=4), 10)) " *
-                    "(SE: $(round(result.std_errors[i], digits=4)))")
-    end
+    z = result.coefficients ./ result.std_errors
+    print_coeftable(io, [name(term) for term in result.model.terms],
+                    result.coefficients, result.std_errors, _z_pvalues(z);
+                    z_values=z)
 end
 
+# StatsAPI interface: methods on the shared statistics generics, so results
+# interoperate with StatsBase/GLM-style tooling (`coef(fit)`, `vcov(fit)`, ...)
+
+# Number of free dyads (pseudo-likelihood contributions)
+function _n_dyads(model::CountERGMModel)
+    n = Int(nv(model.network))
+    return model.directed ? n * (n - 1) : n * (n - 1) ÷ 2
+end
+
+StatsAPI.coef(result::CountERGMResult) = result.coefficients
+StatsAPI.stderror(result::CountERGMResult) = result.std_errors
+StatsAPI.vcov(result::CountERGMResult) = result.vcov
+StatsAPI.loglikelihood(result::CountERGMResult) = result.loglik
+StatsAPI.nobs(result::CountERGMResult) = _n_dyads(result.model)
+StatsAPI.dof(result::CountERGMResult) = length(result.coefficients)
+
 """
-    ergm_count(net::Network, terms; reference=PoissonReference(), kwargs...)
+    fit_ergm_count(net::Network, terms; reference=PoissonReference(), kwargs...)
 
 Fit an ERGM for count-valued networks by maximum pseudo-likelihood: each
 dyad's conditional distribution over the count support
 `P(y_ij = y | rest) ∝ h(y)·exp(θ'Δg(y))` is used as an independent
 likelihood contribution. The reference measure `h` enters the estimator
 directly.
+
+[`ergm_count`](@ref) is the R-faithful alias (matching the `ergm.count`
+package); `fit_count_ergm` is a legacy alias.
 
 # Arguments
 - `net`: Network with `:weight` edge attribute (unweighted edges count as 1)
@@ -631,12 +702,12 @@ directly.
 # Returns
 - `CountERGMResult`: Fitted model results
 """
-function ergm_count(net::Network{T}, terms::Vector{<:AbstractERGMTerm};
-                    reference::AbstractReferenceMeasure=PoissonReference(),
-                    method::Symbol=:mple,
-                    maxiter::Int=100,
-                    tol::Float64=1e-8,
-                    max_val::Union{Int,Nothing}=nothing) where T
+function fit_ergm_count(net::Network{T}, terms::Vector{<:AbstractERGMTerm};
+                        reference::AbstractReferenceMeasure=PoissonReference(),
+                        method::Symbol=:mple,
+                        maxiter::Int=100,
+                        tol::Float64=1e-8,
+                        max_val::Union{Int,Nothing}=nothing) where T
 
     model = CountERGMModel{T}(collect(AbstractERGMTerm, terms), net,
                               reference, is_directed(net))
@@ -648,7 +719,20 @@ function ergm_count(net::Network{T}, terms::Vector{<:AbstractERGMTerm};
     end
 end
 
-const fit_count_ergm = ergm_count
+"""
+    ergm_count(net::Network, terms; kwargs...)
+
+R-faithful alias for [`fit_ergm_count`](@ref) (the same function), matching
+the R `ergm.count` package name.
+"""
+const ergm_count = fit_ergm_count
+
+"""
+    fit_count_ergm(net::Network, terms; kwargs...)
+
+Alias for [`fit_ergm_count`](@ref), kept for backward compatibility.
+"""
+const fit_count_ergm = fit_ergm_count
 
 # All dyads of the network as (i, j) pairs
 function _dyads(net)
@@ -674,6 +758,9 @@ end
 Maximum pseudo-likelihood estimation for count ERGMs. For each dyad the
 full conditional over the count support is enumerated, so the score is
 `Σ_dyads [Δg(y_obs) − E_θ(Δg)]` and the Hessian is `−Σ_dyads Var_θ(Δg)`.
+The pseudo-log-likelihood is maximized with the shared
+`ERGM.newton_fit` Newton–Raphson-with-step-halving optimizer (documented
+in ERGM.jl).
 """
 function count_mple(model::CountERGMModel{T}; maxiter::Int=100,
                     tol::Float64=1e-8,
@@ -682,7 +769,8 @@ function count_mple(model::CountERGMModel{T}; maxiter::Int=100,
     terms = model.terms
     ref = model.reference
     n_terms = length(terms)
-    weights = _get_weights(net)
+    # Typed snapshot of the :weight attribute (see _simulate_count)
+    weights = get_edge_attribute(net, :weight, Int)
 
     mv = isnothing(max_val) ? _default_max_val(net, weights) : max_val
     support = _support(ref, mv)
@@ -711,10 +799,6 @@ function count_mple(model::CountERGMModel{T}; maxiter::Int=100,
             end
         end
     end
-
-    coef = zeros(n_terms)
-    ll = -Inf
-    converged = false
 
     # Pseudo-log-likelihood, gradient, Hessian at β
     function derivatives(β)
@@ -750,41 +834,11 @@ function count_mple(model::CountERGMModel{T}; maxiter::Int=100,
         return llv, grad, hess
     end
 
-    ll, grad, hess = derivatives(coef)
+    # Maximize with ERGM.jl's shared Newton-with-step-halving optimizer
+    fit = newton_fit(derivatives, zeros(n_terms); maxiter=maxiter, tol=tol)
 
-    for _ in 1:maxiter
-        step = try
-            -hess \ grad
-        catch
-            break
-        end
-
-        # Step-halving to guarantee ascent
-        stepsize = 1.0
-        ll_new, grad_new, hess_new = ll, grad, hess
-        for _ in 1:10
-            ll_new, grad_new, hess_new = derivatives(coef .+ stepsize .* step)
-            ll_new >= ll && break
-            stepsize /= 2
-        end
-
-        coef .+= stepsize .* step
-        ll_change = abs(ll_new - ll)
-        ll, grad, hess = ll_new, grad_new, hess_new
-
-        if ll_change < tol && norm(grad) < sqrt(tol)
-            converged = true
-            break
-        end
-    end
-
-    se = try
-        sqrt.(abs.(diag(pinv(-hess))))
-    catch
-        fill(NaN, n_terms)
-    end
-
-    return CountERGMResult{T}(model, coef, se, ll, converged, last(support))
+    return CountERGMResult{T}(model, fit.θ, fit.se, fit.vcov, fit.loglik,
+                              fit.converged, last(support))
 end
 
 # =============================================================================
@@ -792,28 +846,35 @@ end
 # =============================================================================
 
 """
-    simulate_count_ergm(result::CountERGMResult; n_sim=1, kwargs...) -> Vector{Network}
+    simulate_count_ergm(result::CountERGMResult; n_sim=1, burnin=100,
+                        interval=10, max_val=nothing,
+                        rng=Random.default_rng()) -> Vector{Network}
 
 Simulate networks from a fitted count ERGM by Gibbs sampling: each dyad is
 resampled from its full conditional
 `P(y_ij = y | rest) ∝ h(y)·exp(θ'Δg(y))`, using each term's proper change
 statistic, so structural terms (mutuality, transitivity, node strength)
 influence the draws.
+
+All random draws flow through `rng`; the same rng state yields identical
+output.
 """
 function simulate_count_ergm(result::CountERGMResult{T};
                              n_sim::Int=1,
                              burnin::Int=100,
                              interval::Int=10,
-                             max_val::Union{Int,Nothing}=nothing) where T
+                             max_val::Union{Int,Nothing}=nothing,
+                             rng::Random.AbstractRNG=Random.default_rng()) where T
     model = result.model
     mv = isnothing(max_val) ? result.max_val : max_val
     return _simulate_count(model.network, model.terms, model.reference,
                            result.coefficients; n_sim=n_sim, burnin=burnin,
-                           interval=interval, max_val=mv)
+                           interval=interval, max_val=mv, rng=rng)
 end
 
 """
-    simulate_count_ergm(net, terms, coefficients; reference=PoissonReference(), kwargs...)
+    simulate_count_ergm(net, terms, coefficients; reference=PoissonReference(),
+                        rng=Random.default_rng(), kwargs...)
 
 Simulate count networks from an ERGM specification (without fitting).
 `net` provides the size, directedness, and starting state.
@@ -824,17 +885,19 @@ function simulate_count_ergm(net::Network{T}, terms::Vector{<:AbstractERGMTerm},
                              n_sim::Int=1,
                              burnin::Int=100,
                              interval::Int=10,
-                             max_val::Int=20) where T
+                             max_val::Int=20,
+                             rng::Random.AbstractRNG=Random.default_rng()) where T
     return _simulate_count(net, collect(AbstractERGMTerm, terms), reference,
                            coefficients; n_sim=n_sim, burnin=burnin,
-                           interval=interval, max_val=max_val)
+                           interval=interval, max_val=max_val, rng=rng)
 end
 
 function _simulate_count(net0::Network{T}, terms::Vector{AbstractERGMTerm},
                          ref::AbstractReferenceMeasure,
                          coefficients::Vector{Float64};
                          n_sim::Int, burnin::Int, interval::Int,
-                         max_val::Int) where T
+                         max_val::Int,
+                         rng::Random.AbstractRNG=Random.default_rng()) where T
     networks = Network{T}[]
 
     current = deepcopy(net0)
@@ -843,10 +906,18 @@ function _simulate_count(net0::Network{T}, terms::Vector{AbstractERGMTerm},
     support = _support(ref, max_val)
     log_h = [log_reference(ref, y) for y in support]
     log_probs = Vector{Float64}(undef, length(support))
+    probs = Vector{Float64}(undef, length(support))
+
+    # Typed snapshot of the :weight edge attribute. The attribute storage is
+    # an untyped Dict{Tuple{T,T},Any}, which makes every dyad_value read in
+    # the innermost conditional loop type-unstable; snapshotting once into a
+    # Dict{Tuple{T,T},Int} (Network.jl's typed accessor) and maintaining it
+    # incrementally alongside the network keeps the hot loop concretely
+    # typed.
+    weights = get_edge_attribute(current, :weight, Int)
 
     # One Gibbs sweep updates every dyad once
     for sweep in 1:(burnin + n_sim * interval)
-        weights = _get_weights(current)
         for i in 1:n
             for j in (directed ? (1:n) : (i+1:n))
                 i == j && continue
@@ -863,21 +934,22 @@ function _simulate_count(net0::Network{T}, terms::Vector{AbstractERGMTerm},
                 end
 
                 log_probs .-= maximum(log_probs)
-                probs = exp.(log_probs)
+                probs .= exp.(log_probs)
                 probs ./= sum(probs)
 
-                new_val = support[sample(eachindex(support), Weights(probs))]
+                new_val = support[sample(rng, eachindex(support), Weights(probs))]
 
-                # Update network and weight dictionary in place
+                # Update the network, its :weight attribute, and the typed
+                # snapshot in place
                 if new_val > 0
                     if !has_edge(current, i, j)
                         add_edge!(current, i, j)
                     end
                     set_edge_attribute!(current, :weight, i, j, new_val)
-                    weights = _get_weights(current)
+                    weights[_wkey(current, i, j)] = new_val
                 elseif old > 0
-                    rem_edge!(current, i, j)
-                    weights = _get_weights(current)
+                    rem_edge!(current, i, j)  # also drops the edge's attributes
+                    delete!(weights, _wkey(current, i, j))
                 end
             end
         end
@@ -888,6 +960,83 @@ function _simulate_count(net0::Network{T}, terms::Vector{AbstractERGMTerm},
     end
 
     return networks
+end
+
+# =============================================================================
+# Goodness of Fit
+# =============================================================================
+
+# Maximum dyad count value in a network (0 for an empty network)
+function _max_dyad_value(net)
+    weights = get_edge_attribute(net, :weight, Int)
+    m = 0
+    for e in edges(net)
+        m = max(m, Int(get(weights, _wkey(net, src(e), dst(e)), 1)))
+    end
+    return m
+end
+
+# Number of dyads with count value k, for k in 0:K (zeros are the dyads
+# without an edge)
+function _dyad_value_counts(net, K::Int)
+    weights = get_edge_attribute(net, :weight, Int)
+    counts = zeros(Float64, K + 1)
+    for e in edges(net)
+        w = clamp(Int(get(weights, _wkey(net, src(e), dst(e)), 1)), 0, K)
+        counts[w + 1] += 1
+    end
+    n = Int(nv(net))
+    n_dyads = is_directed(net) ? n * (n - 1) : n * (n - 1) ÷ 2
+    counts[1] += n_dyads - ne(net)
+    return counts
+end
+
+"""
+    gof(result::CountERGMResult; n_sim=100, burnin=100, interval=10,
+        max_val=nothing, rng=Random.default_rng()) -> GOFResult
+
+Goodness-of-fit assessment of a fitted count ERGM: networks are simulated
+from the fitted model with [`simulate_count_ergm`](@ref) and compared with
+the observed network on
+
+- the model statistics (one level per term), and
+- the distribution of dyad count values (number of dyads with value
+  0, 1, 2, ...).
+
+This is a method of the shared `Network.gof` generic; it returns the
+shared `Network.GOFResult` (observed value, simulation envelope, and
+two-sided Monte-Carlo p-value per level).
+
+# Keyword Arguments
+- `n_sim::Int=100`: Number of simulated networks
+- `burnin`, `interval`, `max_val`, `rng`: passed to
+  [`simulate_count_ergm`](@ref)
+"""
+function gof(result::CountERGMResult; n_sim::Int=100, burnin::Int=100,
+             interval::Int=10, max_val::Union{Int,Nothing}=nothing,
+             rng::Random.AbstractRNG=Random.default_rng())
+    net = result.model.network
+    terms = result.model.terms
+    sims = simulate_count_ergm(result; n_sim=n_sim, burnin=burnin,
+                               interval=interval, max_val=max_val, rng=rng)
+
+    # Model statistics: observed vs simulated
+    obs_stats = [compute(term, net) for term in terms]
+    sim_stats = [compute(term, s) for s in sims, term in terms]
+    stats = GOFStatistic("model statistics", [name(term) for term in terms],
+                         obs_stats, sim_stats)
+
+    # Dyad count-value distribution
+    K = maximum(_max_dyad_value(s) for s in sims; init=_max_dyad_value(net))
+    obs_counts = _dyad_value_counts(net, K)
+    sim_counts = Matrix{Float64}(undef, n_sim, K + 1)
+    for (r, s) in enumerate(sims)
+        sim_counts[r, :] .= _dyad_value_counts(s, K)
+    end
+    values = GOFStatistic("dyad count values", string.(0:K),
+                          obs_counts, sim_counts)
+
+    return GOFResult([stats, values]; model="Count ERGM")
 end
 
 end # module
