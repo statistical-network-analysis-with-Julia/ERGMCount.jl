@@ -40,7 +40,7 @@ makedocs(
 )
 
 deploydocs(
-    repo = "github.com/Statistical-network-analysis-with-Julia/ERGMCount.jl.git",
+    repo = "github.com/statistical-network-analysis-with-Julia/ERGMCount.jl.git",
     devbranch = "main",
     versions = [
         "stable" => "dev",
