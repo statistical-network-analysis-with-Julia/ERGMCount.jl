@@ -22,7 +22,22 @@ jobs:
       pull-requests: read
     runs-on: ubuntu-latest
     steps:
+      # The fifteen packages are independent repositories that find each other
+      # through [sources] path dependencies (`Networks = {path = "../Networks.jl"}`).
+      # A lone checkout has no siblings, so those paths dangle and Pkg fails to
+      # resolve before a single test runs. Rebuild the layout every developer has
+      # locally: this package in a directory named after it, siblings beside it.
       - uses: actions/checkout@v4
+        with:
+          path: ERGMCount.jl
+
+      - name: Reconstruct the ecosystem layout
+        shell: bash
+        run: |
+          org=https://github.com/statistical-network-analysis-with-Julia
+          for pkg in Networks ERGM; do
+            git clone --depth 1 --quiet "$org/$pkg.jl" "$pkg.jl"
+          done
 
       - uses: julia-actions/setup-julia@v2
         with:
@@ -30,14 +45,17 @@ jobs:
 
       - uses: julia-actions/cache@v2
 
+      # docs/Project.toml already sources this package as `{path = ".."}`, so
+      # instantiate is all that is needed. (A Pkg.develop(path=pwd()) here would
+      # rewrite that entry to an absolute path.)
       - name: Install dependencies
-        run: |
-          julia --project=docs -e '
-            using Pkg
-            Pkg.develop(PackageSpec(path=pwd()))
-            Pkg.instantiate()'
+        shell: bash
+        working-directory: ERGMCount.jl
+        run: julia --project=docs -e 'using Pkg; Pkg.instantiate()'
 
       - name: Build and deploy documentation
+        shell: bash
+        working-directory: ERGMCount.jl
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCUMENTER_KEY: ${{ secrets.DOCUMENTER_KEY }}
