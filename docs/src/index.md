@@ -54,13 +54,13 @@ Count ERGMs are widely used in:
 - **Count-specific terms**: Sum, Nonzero, Greaterthan-n, Atleast-n, Mutual, Transitive ties, Cyclical ties, and node strength terms
 - **MPLE estimation**: Maximum Pseudo-Likelihood Estimation via Newton-Raphson optimization
 - **Gibbs sampling simulation**: Generate synthetic count-valued networks from fitted models
-- **Integration with Network.jl**: Uses the Network.jl edge attribute system for edge weights
+- **Integration with Networks.jl**: Uses the Networks.jl edge attribute system for edge weights
 
 ## Installation
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/Network.jl")
+Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/Networks.jl")
 Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/ERGM.jl")
 Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/ERGMCount.jl")
 ```
@@ -75,7 +75,7 @@ Pkg.develop(path="/path/to/ERGMCount.jl")
 ## Quick Start
 
 ```julia
-using Network
+using Networks
 using ERGMCount
 
 # Create a network with edge weights
@@ -168,3 +168,9 @@ ERGMCount.ERGMCount
 3. Hunter, D.R., Handcock, M.S., Butts, C.T., Goodreau, S.M., Morris, M. (2008). ergm: A package to fit, simulate and diagnose exponential-family models for networks. *Journal of Statistical Software*, 24(3).
 
 4. Desmarais, B.A., Cranmer, S.J. (2012). Statistical mechanics of networks: Estimation and uncertainty. *Physica A: Statistical Mechanics and its Applications*, 391(4), 1865-1876.
+
+## Module
+
+```@docs
+ERGMCount
+```

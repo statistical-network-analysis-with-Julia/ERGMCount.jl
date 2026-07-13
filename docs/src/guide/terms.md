@@ -42,7 +42,7 @@ $$\Delta g = \delta$$
 **Example**:
 
 ```julia
-using Network, ERGMCount
+using Networks, ERGMCount
 using ERGM: compute, name   # generic term interface shared with ERGM.jl
 
 net = network(5; directed=true)

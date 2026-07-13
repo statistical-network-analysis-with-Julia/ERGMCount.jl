@@ -235,7 +235,7 @@ Is the count bounded?
 When unsure which reference to use, compare results across multiple references:
 
 ```julia
-using Network, ERGMCount, Random
+using Networks, ERGMCount, Random
 
 rng = Xoshiro(1)
 net = network(10; directed=true)

@@ -23,11 +23,11 @@ This package is a Julia port of the R `ergm.count` package from the StatNet coll
 ## Installation
 
 Requires Julia 1.12+. ERGMCount.jl depends on the unregistered
-[Network.jl](https://github.com/statistical-network-analysis-with-Julia/Network.jl) and [ERGM.jl](https://github.com/statistical-network-analysis-with-Julia/ERGM.jl) packages, which must be added first (in this order):
+[Networks.jl](https://github.com/statistical-network-analysis-with-Julia/Networks.jl) and [ERGM.jl](https://github.com/statistical-network-analysis-with-Julia/ERGM.jl) packages, which must be added first (in this order):
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/Network.jl")
+Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/Networks.jl")
 Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/ERGM.jl")
 Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/ERGMCount.jl")
 ```
@@ -47,7 +47,7 @@ then wire the packages together with no ordered installs needed.
 ## Quick Start
 
 ```julia
-using Network
+using Networks
 using ERGMCount
 
 # Network with edge weights

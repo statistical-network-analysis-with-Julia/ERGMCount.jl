@@ -44,6 +44,19 @@ DiscUnifReference
 DiscUnif2Reference
 ```
 
+### Reference Measure Traits
+
+A reference measure with unbounded support (Poisson, geometric) must be
+truncated to be normalizable, so the fitted model is exact only if the mass
+beyond the truncation point is negligible. `is_truncating` declares which
+measures are affected and `BOUNDARY_MASS_TOL` is the tolerance above which the
+boundary mass is reported as an approximation.
+
+```@docs
+is_truncating
+BOUNDARY_MASS_TOL
+```
+
 ## Model Types
 
 ### CountERGMModel

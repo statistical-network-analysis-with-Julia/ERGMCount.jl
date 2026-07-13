@@ -37,7 +37,7 @@ The examples below assume the packages are loaded and a small count-valued
 network exists:
 
 ```julia
-using Network, ERGMCount
+using Networks, ERGMCount
 using ERGM: compute, name   # generic term interface shared with ERGM.jl
 using Statistics: mean, std
 using Random
@@ -125,7 +125,7 @@ mutual.count    0.2182     0.1729   1.2618    0.2070
 Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
-(The coefficient table is the shared presentation layer from Network.jl,
+(The coefficient table is the shared presentation layer from Networks.jl,
 used identically across the ecosystem's model packages.)
 
 ### Accessing Results

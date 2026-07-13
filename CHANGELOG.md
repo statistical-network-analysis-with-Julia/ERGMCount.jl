@@ -39,9 +39,58 @@ ecosystem-wide `fit_*`/StatsAPI/GOF conventions.
 
 ### Added
 
+- **Provenanced golden fixture against `ergm.count` on Zachary's karate club**
+  (issue #8). `test/fixtures/zach_poisson.toml`, regenerable with
+  `Rscript test/fixtures/r/zach_poisson.R > test/fixtures/zach_poisson.toml`,
+  freezes `zach ~ sum + nonzero` under a Poisson reference (ergm.count 4.1.3).
+
+  The model is **dyad-independent on purpose**: each dyad is then an independent
+  draw from a two-parameter law with an **exact MLE**, and ERGMCount.jl's
+  dyad-conditional enumeration *is* the likelihood — so it computes that exact
+  MLE and can be held to 1e-6 rather than to "within Monte-Carlo error".
+  ERGMCount.jl reproduces it to **~1e-12** (coefficients and standard errors).
+
+  Two things worth recording:
+
+  - The golden value is solved **analytically** (the score equations collapse to
+    one monotone scalar root-find), not with `optim`. `optim(BFGS, reltol=1e-14)`
+    — the obvious way to write it — landed **7e-6** from the true optimum, *above*
+    the tolerance it was supposed to police. A golden number that is itself only
+    good to 7e-6 cannot hold anyone to 1e-6. The frozen residual score is ~1e-14.
+  - `ergm.count`'s *own* fit is MCMLE (statnet has no MPLE for valued ERGMs) and
+    sits **0.0103** from the exact MLE — further than ERGMCount.jl does. It is
+    frozen as a cross-check, not as the reference standard.
+
+  **Truncation is checked, not assumed.** The Poisson reference is unbounded and
+  the estimator enumerates `0:max_val`; the exact MLE truncates nothing, so they
+  estimate the same thing only if the boundary mass is negligible. The fixture
+  freezes `P(y > 30) = 6.9e-23` under the fitted law, against a
+  smallest-used conditional probability of 2.3e-3 — nineteen orders of magnitude.
+  The testset re-asserts ERGMCount.jl's own reported `boundary_mass` against that
+  bound, so a future `max_val` that started to bite goes red rather than quietly
+  widening the gap.
+
+- **Robust standard errors: `count_mple(model; se=:bootstrap)`** (also via
+  `fit_ergm_count`/`ergm_count`), with the same keywords and semantics as
+  `ERGM.mple`'s: `n_boot=100`, `boot_burnin`, `boot_interval`, `rng`. Gibbs-
+  simulate `n_boot` count networks at θ̂ with `simulate_count_ergm`, refit the
+  count MPLE on each, and report the empirical covariance — on the ONE shared
+  `Networks.bootstrap_cov` loop. **The point estimates are unchanged; only the
+  covariance is replaced.** Until now the only standard errors available were
+  the inverse pseudo-Hessian, which multiplies dyad conditionals as if
+  independent and is therefore anticonservative for any dyad-dependent model —
+  and they were printed with significance stars (issue #9, ERGMCount#2). On the
+  test fixture (`SumTerm` + `CountMutualTerm`) the bootstrap SE of `sum` is ~20%
+  **larger** than the Hessian one; that gap is the anticonservatism.
+- `se_method(fit)` now reports what was actually used (`:hessian`/`:bootstrap`),
+  read off the new `CountERGMResult.se_type` field, and `approximations(fit)`
+  and `show` drop the anticonservatism caveat when a bootstrap was used (they
+  keep the *point-estimate* pseudo-likelihood caveat, which holds either way).
+  `show` now names the standard-error estimator on its own line.
+
 - `gof(::CountERGMResult; n_sim, burnin, interval, max_val, rng)` extending
-  the ecosystem-wide `Network.gof`, comparing model statistics and the
-  dyad count-value distribution in a `Network.GOFResult`.
+  the ecosystem-wide `Networks.gof`, comparing model statistics and the
+  dyad count-value distribution in a `Networks.GOFResult`.
 - StatsAPI accessors: `coef`, `stderror`, `vcov`, `loglikelihood`, `nobs`,
   `dof`; exported `CountERGMModel`/`CountERGMResult`.
 - `rng::AbstractRNG` keywords on fitting, simulation, and
@@ -59,7 +108,7 @@ ecosystem-wide `fit_*`/StatsAPI/GOF conventions.
   logistic `y > 0` approximation.
 - `TransitiveTiesTerm`/`CyclicalTiesTerm` normalized to ordered distinct
   triples with correct directed/undirected change statistics.
-- Results print through the shared `Network.print_coeftable`; p-values
+- Results print through the shared `Networks.print_coeftable`; p-values
   computed with `ccdf(Normal(), |z|)` (no underflow to exactly `0.0`).
 - Simulation defaults changed: `burnin` 1000 → 100 sweeps, `interval`
   100 → 10 (a sweep already visits every dyad).
@@ -75,6 +124,19 @@ ecosystem-wide `fit_*`/StatsAPI/GOF conventions.
 
 ### Performance
 
+- **The MPLE derivative loop no longer allocates (review finding 15).** The
+  conditional moments `E[Δg]` and `E[Δg Δg']` were rebuilt per dyad —
+  `zeros(n_terms)`, `zeros(n_terms, n_terms)`, and a fresh `p .* (x * x')` outer
+  product for *every support value* — i.e. `n_dyads × (2 + |support|)`
+  allocations on every Newton evaluation: **2.1 MB per evaluation** on `zach` at
+  `max_val = 30`, and it grew with the support, which is exactly the knob a user
+  turns up to make the truncation harmless. They are now filled in place on
+  workspaces allocated once (`_count_derivatives`): **192 bytes** per
+  evaluation, independent of dyads and support, and **4.8x faster**
+  (1.734 ms -> 0.360 ms). The scalar arithmetic is unchanged — each entry is
+  still `p * (x[k] * x[l])`, accumulated in the same order — so the fit is
+  **bit-for-bit** what it was, which is what the exact-MLE golden fixture
+  requires. Pinned by an `@allocated` regression test.
 - A typed `:weight` snapshot (`Dict{Tuple{T,T},Int}` via
   `get_edge_attribute(net, :weight, Int)`) is maintained incrementally,
   removing untyped-`Any` lookups from the innermost Gibbs conditional loop.

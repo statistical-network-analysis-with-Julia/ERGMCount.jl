@@ -8,12 +8,12 @@ Install ERGMCount.jl from GitHub:
 
 ```julia
 using Pkg
-Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/Network.jl")
+Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/Networks.jl")
 Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/ERGM.jl")
 Pkg.add(url="https://github.com/statistical-network-analysis-with-Julia/ERGMCount.jl")
 ```
 
-ERGMCount.jl depends on Network.jl and ERGM.jl, which will be installed automatically.
+ERGMCount.jl depends on Networks.jl and ERGM.jl, which will be installed automatically.
 
 ## Basic Workflow
 
@@ -26,10 +26,10 @@ The typical ERGMCount.jl workflow consists of four steps:
 
 ## Step 1: Create a Count-Valued Network
 
-Count-valued networks use the `Network` type from Network.jl with edge weights stored as attributes:
+Count-valued networks use the `Network` type from Networks.jl with edge weights stored as attributes:
 
 ```julia
-using Network
+using Networks
 using ERGMCount
 
 # Create a directed network with 10 nodes
@@ -223,7 +223,7 @@ Coefficients in count ERGMs relate to the conditional distribution of each edge 
 ## Complete Example
 
 ```julia
-using Network
+using Networks
 using ERGMCount
 using Random
 using ERGM: compute, name   # generic term interface shared with ERGM.jl

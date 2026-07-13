@@ -45,7 +45,7 @@ simulate_count_ergm
 ### gof
 
 Goodness-of-fit assessment is provided as a method of the shared
-`Network.gof` generic, so the same `gof(result)` call works across the
+`Networks.gof` generic, so the same `gof(result)` call works across the
 model packages of the ecosystem.
 
 ```@docs
