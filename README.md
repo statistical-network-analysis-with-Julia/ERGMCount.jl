@@ -187,6 +187,21 @@ For more detailed documentation, see:
 
 3. Hunter, D.R., Handcock, M.S., Butts, C.T., Goodreau, S.M., Morris, M. (2008). ergm: A package to fit, simulate and diagnose exponential-family models for networks. *Journal of Statistical Software*, 24(3), 1-29.
 
+## Citation
+
+If you use ERGMCount.jl in your work, please cite it using the entry in
+[`CITATION.bib`](CITATION.bib):
+
+```biblatex
+@misc{SNWJERGMCountJL,
+  author = {{Statistical Network Analysis with Julia}},
+  title = {ERGMCount.jl: Exponential Random Graph Models for Count-Valued Networks in Julia},
+  year = {2026},
+  url = {https://github.com/statistical-network-analysis-with-Julia/ERGMCount.jl},
+  note = {Homepage: https://statistical-network-analysis-with-Julia.github.io/ERGMCount.jl; GitHub: https://github.com/statistical-network-analysis-with-Julia}
+}
+```
+
 ## License
 
 MIT License - see [LICENSE](LICENSE) for details.

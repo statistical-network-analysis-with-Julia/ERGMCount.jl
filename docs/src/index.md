@@ -169,6 +169,22 @@ ERGMCount.ERGMCount
 
 4. Desmarais, B.A., Cranmer, S.J. (2012). Statistical mechanics of networks: Estimation and uncertainty. *Physica A: Statistical Mechanics and its Applications*, 391(4), 1865-1876.
 
+
+## Citation
+
+If you use ERGMCount.jl in your work, please cite it using the entry in
+[`CITATION.bib`](https://github.com/statistical-network-analysis-with-Julia/ERGMCount.jl/blob/main/CITATION.bib):
+
+```biblatex
+@misc{SNWJERGMCountJL,
+  author = {{Statistical Network Analysis with Julia}},
+  title = {ERGMCount.jl: Exponential Random Graph Models for Count-Valued Networks in Julia},
+  year = {2026},
+  url = {https://github.com/statistical-network-analysis-with-Julia/ERGMCount.jl},
+  note = {Homepage: https://statistical-network-analysis-with-Julia.github.io/ERGMCount.jl; GitHub: https://github.com/statistical-network-analysis-with-Julia}
+}
+```
+
 ## Module
 
 ```@docs
