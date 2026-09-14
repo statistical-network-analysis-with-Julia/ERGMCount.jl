@@ -1,0 +1,101 @@
+name: Documentation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  # Serialize updates to the shared version tree; PR checks run independently.
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.ref || 'pages' }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    permissions:
+      contents: write
+      statuses: write
+      pull-requests: read
+    runs-on: ubuntu-latest
+    steps:
+      # The fifteen packages are independent repositories that find each other
+      # through [sources] path dependencies (`Networks = {path = "../Networks.jl"}`).
+      # A lone checkout has no siblings, so those paths dangle and Pkg fails to
+      # resolve before a single test runs. Rebuild the layout every developer has
+      # locally: this package in a directory named after it, siblings beside it.
+      - uses: actions/checkout@v4
+        with:
+          path: ERGMCount.jl
+
+      - name: Reconstruct the ecosystem layout
+        shell: bash
+        run: |
+          org=https://github.com/statistical-network-analysis-with-Julia
+          for pkg in Networks ERGM; do
+            git clone --depth 1 --quiet "$org/$pkg.jl" "$pkg.jl"
+          done
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: '1'
+
+      - uses: julia-actions/cache@v2
+
+      # docs/Project.toml already sources this package as `{path = ".."}`, so
+      # instantiate is all that is needed. (A Pkg.develop(path=pwd()) here would
+      # rewrite that entry to an absolute path.)
+      - name: Install dependencies
+        shell: bash
+        working-directory: ERGMCount.jl
+        run: julia --project=docs -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Validate documentation tag
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: julia --startup-file=no -e 'tag = ENV["GITHUB_REF_NAME"]; tryparse(VersionNumber, tag) === nothing && error("Documentation tags must be Julia versions, for example v0.2.0")'
+
+      - name: Build documentation and update version tree
+        shell: bash
+        working-directory: ERGMCount.jl
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: julia --project=docs docs/make.jl
+
+  publish:
+    name: Publish package website
+    needs: build
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      # Documenter maintains the version index and /dev/ and /stable/ on this
+      # branch. Publish that complete tree through the Pages deployment API.
+      - name: Check out generated documentation
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: site
+          persist-credentials: false
+
+      - name: Upload versioned website
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

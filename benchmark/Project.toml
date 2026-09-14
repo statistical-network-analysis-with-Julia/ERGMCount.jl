@@ -1,0 +1,16 @@
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+ERGM = "d623cd87-b018-4e2a-bf53-b77ebcdc9da2"
+ERGMCount = "7556d106-17e3-4d5c-b2ff-836722c37052"
+Networks = "027a387e-e55f-4537-a155-5037e5a23bdb"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources]
+ERGMCount = {path = ".."}
+ERGM = {path = "../../ERGM.jl"}
+Networks = {path = "../../Networks.jl"}
+
+[compat]
+BenchmarkTools = "1"
+julia = "1.12"

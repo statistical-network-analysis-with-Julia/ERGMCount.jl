@@ -1,0 +1,250 @@
+/* Shared package documentation theme. Edit this canonical copy, then run
+ * tools/sync_documentation_theme.jl. Package builds use their local assets only.
+ * Documenter's layout, controls, syntax highlighting and theme switcher stay native.
+ */
+:root {
+    --snwj-paper: #f6f7f2;
+    --snwj-surface: #ffffff;
+    --snwj-sidebar: #eef2eb;
+    --snwj-ink: #1d2b26;
+    --snwj-muted: #52675e;
+    --snwj-forest: #123d32;
+    --snwj-accent: #7257a8;
+    --snwj-border: #d8e1d7;
+    --snwj-selected: #dde8db;
+}
+
+html.theme--documenter-dark {
+    --snwj-paper: #14221d;
+    --snwj-surface: #1c2c25;
+    --snwj-sidebar: #102019;
+    --snwj-ink: #e3ebe3;
+    --snwj-muted: #b0c3b7;
+    --snwj-forest: #b4d5be;
+    --snwj-accent: #c7afea;
+    --snwj-border: #385044;
+    --snwj-selected: #2b4335;
+}
+
+/* Alternate Documenter themes retain their own palette. Only the ecosystem bar
+ * and optional content cards use these matching neutral surface tokens. */
+html.theme--catppuccin-latte {
+    --snwj-paper: #eff1f5; --snwj-surface: #e6e9ef; --snwj-ink: #4c4f69;
+    --snwj-muted: #5c5f77; --snwj-forest: #4c4f69; --snwj-border: #bcc0cc;
+}
+html.theme--catppuccin-frappe,
+html.theme--catppuccin-macchiato,
+html.theme--catppuccin-mocha {
+    --snwj-paper: #24273a; --snwj-surface: #303446; --snwj-ink: #cad3f5;
+    --snwj-muted: #b8c0e0; --snwj-forest: #a6da95; --snwj-border: #5b6078;
+    --snwj-accent: #c6a0f6;
+}
+
+html:root body, html:root button, html:root input, html:root select, html:root textarea {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+html:not([class*="theme--catppuccin-"]) body {
+    background: var(--snwj-paper);
+    color: var(--snwj-ink);
+}
+
+html:root #documenter .docs-main { min-width: 0; }
+html:root #documenter .docs-main > article { line-height: 1.7; }
+html:root #documenter .content h1 {
+    font-size: clamp(2rem, 3.5vw, 2.8rem);
+    letter-spacing: -0.035em;
+    line-height: 1.15;
+    margin-bottom: 1.15rem;
+    overflow-wrap: anywhere;
+}
+html:root #documenter .content h2 {
+    font-size: 1.65rem;
+    letter-spacing: -0.025em;
+    margin-top: 2.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--snwj-border);
+}
+html:root #documenter .content h3 { font-size: 1.2rem; margin-top: 1.75rem; }
+html:root #documenter .content h1 + p { font-size: 1.12rem; }
+html:root #documenter .content p { margin-bottom: 1.2em; }
+html:root #documenter .content pre { border: 1px solid var(--snwj-border); border-radius: 0.5rem; }
+html:root #documenter .content pre code { line-height: 1.55; font-size: 0.88rem; }
+html:root #documenter .content table { display: block; overflow-x: auto; font-size: 0.94rem; }
+html:root #documenter .content table th,
+html:root #documenter .content table td { padding: 0.75rem 0.85rem; }
+html:root #documenter .content table th { font-weight: 650; }
+html:root #documenter .content .admonition { border-radius: 0.4rem; }
+html:root #documenter .content details.docstring { border-radius: 0.5rem; box-shadow: none; }
+html:root #documenter .content details.docstring > summary { padding: 0.85rem 1rem; }
+html:root #documenter .content .snwj-docstring-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 1rem;
+    padding: 0.5rem 1rem;
+    border-bottom: 1px solid var(--snwj-border);
+    font-size: 0.85rem;
+}
+html:root #documenter .snwj-docstring-links a { display: inline-flex; align-items: center; min-height: 2rem; }
+html.theme--documenter-dark #documenter .content .admonition > .admonition-header { color: #c7afea; }
+html.theme--documenter-dark #documenter .content .admonition.is-info > .admonition-header { color: #9dc5ec; }
+html.theme--documenter-dark #documenter .content .admonition.is-success > .admonition-header { color: #b4d5be; }
+html.theme--documenter-dark #documenter .content .admonition.is-warning > .admonition-header { color: #f1d28a; }
+html.theme--documenter-dark #documenter .content .admonition.is-danger > .admonition-header { color: #f0abab; }
+/* Native highlight.js light-theme literals, translucent punctuation, and meta
+ * strings fall below 4.5:1 on its #f5f5f5 code background at normal text sizes. */
+:root:not(.theme--documenter-dark):not([class*="theme--catppuccin-"]) #documenter .hljs-literal { color: #497539; }
+:root:not(.theme--documenter-dark):not([class*="theme--catppuccin-"]) #documenter .hljs-tag,
+:root:not(.theme--documenter-dark):not([class*="theme--catppuccin-"]) #documenter .hljs-punctuation { color: #52675e; }
+:root:not(.theme--documenter-dark):not([class*="theme--catppuccin-"]) #documenter .hljs-meta .hljs-string { color: #1f7199; }
+html:root #documenter .content a:not(.docs-heading-anchor):not(.docs-heading-anchor-permalink):not(.docs-sourcelink):not(.admonition-anchor) {
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+    text-decoration-thickness: 1px;
+}
+
+html:not([class*="theme--catppuccin-"]) #documenter .content,
+html:not([class*="theme--catppuccin-"]) #documenter .content strong {
+    color: var(--snwj-ink);
+}
+html:not([class*="theme--catppuccin-"]) #documenter .content a:not(.docs-sourcelink):not(.admonition-anchor),
+html:not([class*="theme--catppuccin-"]) #documenter .content h1,
+html:not([class*="theme--catppuccin-"]) #documenter .content h2,
+html:not([class*="theme--catppuccin-"]) #documenter .content h3,
+html:not([class*="theme--catppuccin-"]) #documenter .content .docs-heading-anchor {
+    color: var(--snwj-forest);
+}
+html:not([class*="theme--catppuccin-"]) #documenter .content a:hover { color: var(--snwj-accent); }
+html:not([class*="theme--catppuccin-"]) #documenter .content table th {
+    background: var(--snwj-sidebar);
+    color: var(--snwj-ink);
+    border-color: var(--snwj-border);
+}
+html:not([class*="theme--catppuccin-"]) #documenter .content table td { border-color: var(--snwj-border); }
+html:not([class*="theme--catppuccin-"]) #documenter .docs-main header.docs-navbar {
+    background: var(--snwj-paper);
+    border-color: var(--snwj-border);
+}
+html:not([class*="theme--catppuccin-"]) #documenter .docs-navbar a { color: var(--snwj-muted); }
+html:not([class*="theme--catppuccin-"]) #documenter .docs-navbar a:hover { color: var(--snwj-forest); }
+
+html:root #documenter .docs-sidebar .docs-logo { margin-top: 1.4rem; }
+html:root #documenter .docs-sidebar .docs-logo > img { max-height: 3.5rem; }
+html:root #documenter .docs-sidebar .docs-package-name { font-size: 1.3rem; padding: 0.75rem 0; }
+html:root #documenter .docs-sidebar ul.docs-menu { padding-top: 0.6rem; }
+html:root #documenter .docs-sidebar ul.docs-menu .tocitem { padding: 0.6rem 0.8rem; }
+html:root #documenter .docs-sidebar ul.docs-menu ul.internal .tocitem { padding: 0.15rem 0.4rem; }
+html:root #documenter .docs-sidebar #documenter-search-query {
+    min-height: 2.6rem;
+    border-radius: 0.4rem !important;
+    font-size: 0.85rem;
+    box-shadow: none;
+}
+html:not([class*="theme--catppuccin-"]) #documenter .docs-sidebar {
+    background: var(--snwj-sidebar);
+    border-color: var(--snwj-border);
+    color: var(--snwj-ink);
+}
+html:not([class*="theme--catppuccin-"]) #documenter .docs-sidebar .docs-package-name a { color: var(--snwj-forest); }
+html:not([class*="theme--catppuccin-"]) #documenter .docs-sidebar ul.docs-menu .tocitem {
+    background: transparent;
+    color: var(--snwj-muted);
+}
+html:not([class*="theme--catppuccin-"]) #documenter .docs-sidebar ul.docs-menu a.tocitem:hover,
+html:not([class*="theme--catppuccin-"]) #documenter .docs-sidebar ul.docs-menu label.tocitem:hover {
+    background: var(--snwj-selected);
+    color: var(--snwj-forest);
+}
+html:not([class*="theme--catppuccin-"]) #documenter .docs-sidebar ul.docs-menu li.is-active {
+    background: var(--snwj-selected);
+    border-color: var(--snwj-border);
+    box-shadow: inset 3px 0 var(--snwj-accent);
+}
+html:not([class*="theme--catppuccin-"]) #documenter .docs-sidebar ul.docs-menu li.is-active .tocitem,
+html:not([class*="theme--catppuccin-"]) #documenter .docs-sidebar ul.docs-menu li.is-active .tocitem:hover {
+    color: var(--snwj-forest);
+    background: transparent;
+}
+html:not([class*="theme--catppuccin-"]) #documenter .docs-sidebar #documenter-search-query {
+    background: var(--snwj-surface);
+    border-color: var(--snwj-border);
+    color: var(--snwj-muted);
+}
+
+html:root #documenter .snwj-ecosystem {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.25rem 1.5rem;
+    padding: 1.1rem 0 0.8rem;
+    border-bottom: 1px solid var(--snwj-border);
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+html:root #documenter .snwj-ecosystem a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.75rem;
+    color: var(--snwj-muted);
+    text-decoration: none;
+}
+html:root #documenter .snwj-ecosystem a:hover { color: var(--snwj-forest); text-decoration: underline; text-underline-offset: 0.2em; }
+html:root #documenter .snwj-ecosystem .snwj-brand { color: var(--snwj-forest); font-weight: 700; letter-spacing: -0.015em; }
+.snwj-brand-mark { display: inline-flex; gap: 0.2rem; align-items: center; margin-right: 0.7rem; }
+.snwj-brand-mark i { width: 0.4rem; height: 0.4rem; border-radius: 50%; background: var(--snwj-forest); }
+.snwj-brand-mark i:nth-child(2) { background: var(--snwj-accent); transform: translateY(-0.2rem); }
+.snwj-brand-mark i:nth-child(3) { background: var(--snwj-muted); }
+.snwj-ecosystem-links { display: flex; flex-wrap: wrap; gap: 0 1.15rem; }
+.snwj-skip-link {
+    position: fixed;
+    left: 1rem;
+    top: 0.5rem;
+    z-index: 100;
+    transform: translateY(-200%);
+    padding: 0.7rem 1rem;
+    color: var(--snwj-forest);
+    background: var(--snwj-surface);
+    border: 2px solid var(--snwj-accent);
+    border-radius: 0.25rem;
+}
+.snwj-skip-link:focus { transform: translateY(0); }
+html:root #documenter a:focus-visible,
+html:root #documenter button:focus-visible,
+html:root #documenter summary:focus-visible,
+html:root #documenter input:focus-visible,
+html:root #documenter select:focus-visible {
+    outline: 3px solid var(--snwj-accent);
+    outline-offset: 3px;
+}
+html:root #documenter pre:focus-visible,
+html:root #documenter pre > code:focus-visible,
+html:root #documenter table:focus-visible,
+html:root #documenter .math-container:focus-visible {
+    outline: 3px solid var(--snwj-accent);
+    outline-offset: -3px;
+}
+html:root #documenter .docs-footer { margin-top: 3rem; border-color: var(--snwj-border); }
+html:root #documenter .docs-footer .footer-message { line-height: 1.8; }
+
+/* Optional content hooks; standard Markdown needs no custom markup. */
+html:root #documenter .snwj-lead { font-size: 1.18rem; color: var(--snwj-muted); max-width: 65ch; }
+html:root #documenter .snwj-kicker { color: var(--snwj-accent); text-transform: uppercase; letter-spacing: 0.09em; font-size: 0.75rem; font-weight: 700; }
+.snwj-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: 1rem; margin: 1.5rem 0; }
+.snwj-card { border: 1px solid var(--snwj-border); border-radius: 0.6rem; background: var(--snwj-surface); padding: 1.3rem; }
+
+@media (max-width: 1055px) {
+    html:root #documenter .snwj-ecosystem { padding: 0.7rem 1rem; }
+}
+@media (max-width: 600px) {
+    html:root #documenter .snwj-ecosystem { gap: 0; font-size: 0.78rem; }
+    .snwj-ecosystem-links { gap: 0 1.1rem; }
+    html:root #documenter .content h1 { font-size: 2rem; }
+    html:root #documenter .content h2 { font-size: 1.45rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+    html:root #documenter .docs-sidebar, #documenter .docs-navbar { transition: none !important; }
+}
+@media print {
+    html:root #documenter .snwj-ecosystem, .snwj-skip-link { display: none; }
+}

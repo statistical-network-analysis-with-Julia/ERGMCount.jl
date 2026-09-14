@@ -1,0 +1,98 @@
+name = "zach_poisson"
+
+[provenance]
+r_version = "4.6.1"
+ergm_count_version = "4.1.3"
+ergm_version = "4.12.0"
+network_version = "1.20.0"
+seed = 20260713
+script = "test/fixtures/r/zach_poisson.R"
+date = "2026-07-13"
+dataset = "ergm.count::zach (Zachary 1977): 34 karate-club members, undirected, `contexts` edge counts 0-7"
+model = "zach ~ sum + nonzero, response=\"contexts\", reference=~Poisson -- DYAD-INDEPENDENT, so an exact MLE exists and is computed below"
+exact_estimator = "analytic: the score equations reduce to lam*e^lam/(e^lam-1) = mean(y)/P(y>0), solved by uniroot to 1e-14; NOT optim, which was only good to 7e-6 and could not license the 1e-6 tolerance below"
+mcmle_control = "control.ergm(MCMC.samplesize=4096, MCMC.burnin=16384, MCMC.interval=1024)"
+replication_seeds = "101,202,303,404,505"
+max_val = 30
+
+[tolerance]
+# Observed sufficient statistics: a deterministic function of the data.
+# Machine precision; a disagreement is a bug in a term formula.
+summary_statistics = 1e-9
+#
+# EXACT MLE. sum + nonzero under a Poisson reference is dyad-independent, so
+# ERGMCount.jl's dyad-conditional enumeration IS the likelihood and it is
+# computing the same exact MLE that `optim` computes here. Both are solving a
+# two-parameter concave problem to convergence, with no Monte Carlo on either
+# side. 1e-6 is optimizer precision and ~1e-5 of the smallest standard error
+# in the model. If this fails it is a BUG in the estimator, the reference
+# measure, or a change statistic. DO NOT LOOSEN IT.
+#
+# The one thing that could make this comparison meaningless is truncation:
+# ERGMCount.jl enumerates 0:max_val and the exact MLE does not truncate at
+# all. `boundary_tail_mass` below is the exact P(y > 30) under the fitted
+# law -- see `boundary_tail_mass_log10` -- and it is ~19 orders of magnitude
+# below the smallest conditional probability the estimator actually uses
+# (`min_used_conditional_prob`). The truncation cannot
+# reach the 1e-6 being asserted. That is a property of THIS dataset (counts
+# 0-7, fitted rate ~2.8), not of the estimator, and the Julia testset
+# re-checks ERGMCount.jl's own reported `boundary_mass` so that a future
+# max_val that started to bite goes red instead of quietly drifting.
+exact_coefficients = 1e-6
+exact_std_errors = 1e-6
+#
+# ergm.count's OWN fit is MCMLE -- statnet has no MPLE for valued ERGMs -- so
+# it carries Monte-Carlo error that the exact MLE does not. Read `mcmle_sd`
+# in [values]: that is ergm.count refitting this model under five further
+# seeds and disagreeing with itself. It is the floor here. The frozen MCMLE
+# fit sits `mcmle_vs_exact_max_abs_diff` away from the exact answer -- which
+# is FURTHER than ERGMCount.jl sits from it. So this comparison is a
+# consistency check on ergm.count, not the reference standard; the reference
+# standard is `exact_coefficients` above. Tolerance = 6x the largest observed
+# MCMLE seed-to-seed sd, which comfortably covers the single frozen draw.
+mcmle_coefficients = 0.05
+
+[values]
+# --- the network, frozen. Julia rebuilds it exactly. --------------------
+n_actors = 34
+directed = false
+edge_src = [1, 1, 2, 1, 2, 3, 1, 1, 1, 5, 6, 1, 2, 3, 4, 1, 3, 3, 1, 5, 6, 1, 1, 4, 1, 2, 3, 4, 6, 7, 1, 2, 1, 2, 1, 2, 24, 25, 3, 24, 25, 3, 24, 27, 2, 9, 1, 25, 26, 29, 3, 9, 15, 16, 19, 21, 23, 24, 30, 31, 32, 9, 10, 14, 15, 16, 19, 20, 21, 23, 24, 27, 28, 29, 30, 31, 32, 33]
+edge_dst = [2, 3, 3, 4, 4, 4, 5, 6, 7, 7, 7, 8, 8, 8, 8, 9, 9, 10, 11, 11, 11, 12, 13, 13, 14, 14, 14, 14, 17, 17, 18, 18, 20, 20, 22, 22, 26, 26, 28, 28, 28, 29, 30, 30, 31, 31, 32, 32, 32, 32, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34]
+edge_weight = [4, 5, 6, 3, 3, 3, 3, 3, 3, 2, 5, 2, 4, 4, 3, 2, 5, 1, 2, 3, 3, 3, 1, 3, 3, 5, 3, 3, 3, 3, 2, 1, 2, 2, 2, 2, 5, 2, 2, 4, 3, 2, 3, 4, 2, 3, 2, 2, 7, 2, 2, 3, 3, 3, 1, 3, 2, 5, 4, 3, 4, 4, 2, 3, 2, 4, 2, 1, 1, 3, 4, 2, 4, 2, 2, 3, 4, 5]
+n_dyads = 561
+max_val = 30
+
+# --- observed sufficient statistics, deterministic ----------------------
+summary_statistic_names = ["sum", "nonzero"]
+summary_statistics = [231, 78]
+
+# --- the EXACT MLE. This is the assertion with teeth. -------------------
+term_names = ["sum", "nonzero"]
+exact_coefficients = [1.0214846599007485, -4.5363986759307391]
+exact_std_errors = [0.072846448803669445, 0.24785802580281341]
+exact_loglik = -353.62676432398541
+# The score (= observed minus expected sufficient statistics) at the frozen
+# solution. This is HOW EXACT the golden value is, and it is what licenses
+# asserting 1e-6 against it. Compare: `optim(BFGS, reltol=1e-14)`, the
+# obvious way to write this, left a score of order 1e-3 and coefficients
+# ~7e-6 off -- above the tolerance it was supposed to police.
+exact_score = [-2.8421709430404007e-14, 1.4210854715202004e-14]
+
+# P(y > max_val) under the fitted law: the entire error the 0:max_val
+# truncation introduces into ERGMCount.jl's likelihood. If this were not
+# negligible the comparison above would be void.
+boundary_tail_mass = 6.9425920198126657e-23
+boundary_tail_mass_log10 = -22.158478355231715
+# For scale: the SMALLEST conditional probability the estimator actually
+# uses on the observed support (counts 0-7). The truncation error is
+# negligible only relative to this, and it is ~19 orders of magnitude below.
+min_used_conditional_prob = 0.0023323669479226221
+
+# --- ergm.count's own MCMLE, for cross-checking the exact answer --------
+mcmle_coefficients = [1.0263033107902975, -4.5466911015965463]
+mcmle_std_errors = [0.071514253548452714, 0.24254659665170927]
+# ergm.count disagreeing with ITSELF over five further seeds.
+mcmle_sd = [0.0028182363755531433, 0.007238266896555069]
+# ...and how far its frozen fit sits from the exact MLE. Compare this with
+# the gap the Julia testset reports between ERGMCount.jl and the exact MLE.
+mcmle_vs_exact_max_abs_diff = 0.010292425665807237
