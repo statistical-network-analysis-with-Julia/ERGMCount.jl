@@ -10,7 +10,7 @@ makedocs(
     format = Documenter.HTML(
         prettyurls = get(ENV, "DOCS_PRETTY_URLS", get(ENV, "CI", "false")) == "true",
         canonical = "https://statistical-network-analysis-with-Julia.github.io/ERGMCount.jl/dev/",
-        assets = ["assets/snwj-docs.css", "assets/snwj-docs.js"],
+        assets = ["assets/favicon.ico"],
         footer = "[Ecosystem home](/) · [Packages](/packages/) · [Get started](/getting-started/) · [Capabilities](/capabilities/) — Built with [Documenter.jl](https://github.com/JuliaDocs/Documenter.jl).",
         edit_link = "main",
     ),

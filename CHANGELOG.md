@@ -482,6 +482,8 @@ ecosystem-wide `fit_*`/StatsAPI/GOF conventions.
 
 ### Changed
 
+- Documentation uses the default Documenter themes, with a new package-specific
+  SVG icon and browser favicon in the official Julia logo colors.
 - **Shared contracts imported, never re-implemented (panel 2026-09, items
   13/14/28):** `newton_fit`, `z_pvalues`, `check_se` and `CoefficientTable`
   come from Networks.jl (`ERGM.newton_fit === Networks.newton_fit`); the
