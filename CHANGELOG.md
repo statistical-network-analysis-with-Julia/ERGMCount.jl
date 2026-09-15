@@ -523,6 +523,9 @@ ecosystem-wide `fit_*`/StatsAPI/GOF conventions.
 
 ### Fixed
 
+- CI executes docstring examples from Windows CRLF checkouts and verifies
+  numerically singular fits against the condition-number threshold, allowing
+  SVD implementations that return a large finite value instead of infinity.
 - **Round 3:**
   - **The adaptive support stops on a rung whose Newton failed.** On an
     exactly collinear design (`sum + greaterthan(2) + atleast(3)` on zach)

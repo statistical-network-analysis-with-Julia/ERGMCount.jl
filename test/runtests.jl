@@ -1766,10 +1766,12 @@ const ALL_TERMS = [SumTerm(), NonzeroTerm(), GreaterthannTerm(2),
         end
         terms = [SumTerm(), NonzeroTerm(), GreaterthannTerm(2), CountAtleastnTerm(3)]
         @test compute(GreaterthannTerm(2), zach) == compute(CountAtleastnTerm(3), zach)
-        fc = @test_logs (:warn, r"numerically singular \(condition number Inf") match_mode = :any begin
+        # SVD roundoff can report a huge finite condition number for an
+        # exactly singular design; the numerical-rank policy is the contract.
+        fc = @test_logs (:warn, r"numerically singular \(condition number") match_mode = :any begin
             fit_ergm_count(zach, terms; max_val=14)
         end
-        @test fc.hessian_cond == Inf
+        @test fc.hessian_cond > ERGMCount._HESSIAN_COND_TOL
         @test fc.collinear == ["greaterthan.2", "atleast.3"]
         @test all(isnan, stderror(fc))
         @test !fc.separated
@@ -2063,7 +2065,7 @@ const ALL_TERMS = [SumTerm(), NonzeroTerm(), GreaterthannTerm(2),
         @test fc.max_val <= 28                       # the first rung, or the first doubling
         @test fc.support_control === :unconverged && !fc.support_stable
         @test isnan(fc.support_delta) && isnan(fc.omitted_tail)
-        @test !fc.converged && fc.hessian_cond == Inf
+        @test !fc.converged && fc.hessian_cond > ERGMCount._HESSIAN_COND_TOL
         @test fc.collinear == ["greaterthan.2", "atleast.3"]
         warns = [r.message for r in rec[1] if r.level == Base.CoreLogging.Warn]
         @test !any(occursin("normalisable", w) for w in warns)
@@ -2161,7 +2163,8 @@ const ALL_TERMS = [SumTerm(), NonzeroTerm(), GreaterthannTerm(2),
         # ... and every ```julia fence in the source docstrings executes as
         # written (a fresh module per block, warnings silenced)
         src = read(joinpath(dirname(@__DIR__), "src", "ERGMCount.jl"), String)
-        blocks = [String(m.captures[1]) for m in eachmatch(r"```julia\n(.*?)```"s, src)]
+        # Git may check out source files with CRLF line endings on Windows.
+        blocks = [String(m.captures[1]) for m in eachmatch(r"```julia\r?\n(.*?)```"s, src)]
         @test length(blocks) >= 40
         for (k, code) in enumerate(blocks)
             m = Module(Symbol("DocBlock", k))
