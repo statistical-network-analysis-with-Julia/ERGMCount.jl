@@ -1,0 +1,89 @@
+name = "count_geometric_drop"
+
+[provenance]
+r_version = "4.6.1"
+ergm_count_version = "4.1.3"
+ergm_version = "4.12.0"
+network_version = "1.20.0"
+seed = 20261007
+script = "test/fixtures/r/count_geometric_drop.R"
+date = "2026-10-07"
+models = "(c) a seeded 20-actor directed count network with strong reciprocity ~ sum + mutual(form=min), response=w, reference=~Geometric; (d) a seeded 16-actor undirected perfect matching ~ sum + nonzero + transitiveweights(min,max,min), response=w, reference=~Poisson"
+estimator = "ergm.count MCMLE at control.ergm defaults, nine seeds (1..9) per model"
+
+[tolerance]
+# Observed statistics are deterministic functions of the graph.
+summary_statistics = 1e-9
+# The band of count_mcmle.toml: a Julia fit within
+# band_sd * sqrt(sd_k^2 + sd_k^2 / n_seeds) of R's nine-seed mean, floored
+# at floor_se_fraction of R's mean standard error; standard errors likewise.
+band_sd = 4.0
+floor_se_fraction = 0.1
+# (c) R's simulated mean count per arc at its seed-1 fit (100 networks)
+# against the observed mean, |difference| < this:
+sim_mean_tolerance = 0.1
+
+[values]
+# --- (c) the seeded directed network, frozen as a valued edge list ------
+geometric_n = 20
+geometric_edge_src = [2, 3, 6, 7, 9, 11, 14, 16, 17, 18, 1, 3, 4, 9, 12, 13, 16, 19, 20, 1, 2, 5, 6, 7, 8, 9, 10, 12, 15, 17, 19, 20, 2, 7, 8, 11, 13, 14, 15, 17, 18, 19, 20, 2, 3, 7, 8, 11, 12, 13, 16, 17, 19, 20, 1, 3, 4, 7, 8, 9, 10, 12, 13, 14, 15, 16, 17, 18, 19, 20, 1, 3, 4, 5, 6, 9, 10, 11, 12, 13, 15, 16, 18, 3, 4, 5, 9, 10, 13, 14, 17, 19, 1, 3, 6, 7, 8, 10, 11, 12, 13, 15, 20, 3, 5, 6, 7, 8, 9, 11, 12, 14, 15, 16, 19, 20, 1, 4, 5, 7, 9, 10, 12, 13, 14, 15, 17, 18, 19, 20, 2, 3, 5, 6, 7, 8, 9, 10, 11, 13, 16, 17, 2, 4, 5, 6, 7, 8, 9, 11, 12, 16, 18, 19, 1, 4, 6, 8, 10, 11, 15, 18, 20, 3, 4, 6, 7, 9, 10, 11, 14, 16, 17, 1, 2, 5, 6, 7, 10, 13, 15, 17, 18, 19, 20, 1, 3, 4, 5, 6, 8, 11, 12, 15, 16, 18, 19, 1, 3, 4, 5, 6, 7, 11, 13, 16, 17, 19, 20, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 16, 17, 18, 2, 3, 4, 5, 6, 9, 10, 11, 14, 16, 18]
+geometric_edge_dst = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]
+geometric_edge_weight = [1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1]
+geometric_term_names = ["sum", "mutual.min"]
+geometric_summary_statistics = [253, 112]
+geometric_seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+geometric_coefficients_seed1 = [-2.5778169459218798, 4.1654257030778439]
+geometric_std_errors_seed1 = [0.18452199262315616, 0.37378174137390591]
+geometric_coefficients_seed2 = [-2.5796181413713475, 4.1698640778881204]
+geometric_std_errors_seed2 = [0.17786364748847885, 0.363508391966956]
+geometric_coefficients_seed3 = [-2.571642369882345, 4.1486267883665597]
+geometric_std_errors_seed3 = [0.19041248375557895, 0.38984419490383326]
+geometric_coefficients_seed4 = [-2.5900180142825513, 4.186260937205013]
+geometric_std_errors_seed4 = [0.1891219585424041, 0.39170713854912159]
+geometric_coefficients_seed5 = [-2.578107283036553, 4.1906220054470529]
+geometric_std_errors_seed5 = [0.18634073735172801, 0.37928901422723527]
+geometric_coefficients_seed6 = [-2.5712069080107645, 4.1543992024776664]
+geometric_std_errors_seed6 = [0.18470254847202069, 0.370151966520749]
+geometric_coefficients_seed7 = [-2.5686622868673199, 4.1494256448236024]
+geometric_std_errors_seed7 = [0.18263631817149903, 0.37513006766542667]
+geometric_coefficients_seed8 = [-2.5731231400877821, 4.1553183960786582]
+geometric_std_errors_seed8 = [0.18030616714017955, 0.37310796131308904]
+geometric_coefficients_seed9 = [-2.5751316581325296, 4.1565041617831788]
+geometric_std_errors_seed9 = [0.18760090119729575, 0.38309347335765009]
+geometric_coefficients_mean = [-2.5761474163992304, 4.164049657460855]
+geometric_coefficients_sd = [0.0063440628441637512, 0.015464309555638054]
+geometric_std_errors_mean = [0.18483408386026012, 0.37773488331977412]
+geometric_std_errors_sd = [0.0040844765141953331, 0.0091971710310250789]
+geometric_r_sim_mean = 0.69439473684210529
+geometric_observed_mean = 0.66578947368421049
+
+# --- (d) the seeded matching, frozen as a valued edge list --------------
+drop_n = 16
+drop_edge_src = [1, 3, 5, 7, 9, 11, 13, 15]
+drop_edge_dst = [2, 4, 6, 8, 10, 12, 14, 16]
+drop_edge_weight = [3, 4, 1, 2, 5, 3, 3, 2]
+drop_term_names = ["sum", "nonzero", "transitiveweights.min.max.min"]
+drop_summary_statistics = [23, 8, 0]
+drop_seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+drop_coefficients_seed1 = [0.98977399857197002, -5.1997742453254876, -inf]
+drop_std_errors_seed1 = [0.21331764421662658, 0.71533717858458024, 0]
+drop_coefficients_seed2 = [0.98002892147156595, -5.1417687279808151, -inf]
+drop_std_errors_seed2 = [0.220932651186771, 0.77155433126094963, 0]
+drop_coefficients_seed3 = [0.99323697098041042, -5.1951949749672499, -inf]
+drop_std_errors_seed3 = [0.21049197628973584, 0.75547225488505043, 0]
+drop_coefficients_seed4 = [0.99515070450700371, -5.2109403975373354, -inf]
+drop_std_errors_seed4 = [0.22020793172092684, 0.74768667306785075, 0]
+drop_coefficients_seed5 = [0.98620779841003703, -5.2020304747750012, -inf]
+drop_std_errors_seed5 = [0.21970432381056396, 0.72859249959680017, 0]
+drop_coefficients_seed6 = [0.97223391372854984, -5.1274766489279884, -inf]
+drop_std_errors_seed6 = [0.23472409848537351, 0.795990593400422, 0]
+drop_coefficients_seed7 = [0.96541406064931456, -5.1523059107916103, -inf]
+drop_std_errors_seed7 = [0.22626936793386923, 0.7302694439553854, 0]
+drop_coefficients_seed8 = [0.9937575816781179, -5.2039310094664621, -inf]
+drop_std_errors_seed8 = [0.21802372586326066, 0.74341603001190104, 0]
+drop_coefficients_seed9 = [0.99145784386354563, -5.218041804330098, -inf]
+drop_std_errors_seed9 = [0.22307231262446167, 0.72668904850751714, 0]
+drop_coefficients_mean = [0.98525131042894609, -5.1834960215668939, -inf]
+drop_coefficients_sd = [0.010513434885833874, 0.033469623906904077, 0]
+drop_std_errors_mean = [0.22074933690350992, 0.74611200591893967, 0]
+drop_std_errors_sd = [0.0070750632029403376, 0.02528539270703406, 0]

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">ERGMCount.jl</title>
+  <desc id="desc">An abacus with one, two and three beads: integer-valued network ties.</desc>
+  <path d="M36 38V220M220 38V220" fill="none" stroke="#4063D8" stroke-width="13" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M36 66H220" fill="none" stroke="#389826" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M36 128H220" fill="none" stroke="#CB3C33" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M36 190H220" fill="none" stroke="#9558B2" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="128" cy="66" r="20" fill="#389826"/>
+  <circle cx="100" cy="128" r="20" fill="#CB3C33"/>
+  <circle cx="156" cy="128" r="20" fill="#CB3C33"/>
+  <circle cx="76" cy="190" r="20" fill="#9558B2"/>
+  <circle cx="128" cy="190" r="20" fill="#9558B2"/>
+  <circle cx="180" cy="190" r="20" fill="#9558B2"/>
+</svg>

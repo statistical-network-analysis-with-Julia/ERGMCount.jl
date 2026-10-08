@@ -1,0 +1,107 @@
+name = "count_mcmle"
+
+[provenance]
+r_version = "4.6.1"
+ergm_count_version = "4.1.3"
+ergm_version = "4.12.0"
+network_version = "1.20.0"
+seed = 20261002
+script = "test/fixtures/r/count_mcmle.R"
+date = "2026-10-02"
+models = "(a) zach ~ sum + nonzero + transitiveweights(min,max,min), response=contexts, reference=~Poisson; (b) a seeded 14-actor directed count matrix ~ sum + nonzero + mutual(form=min), response=w, reference=~Poisson"
+estimator = "ergm.count MCMLE at control.ergm defaults, nine seeds (1..9) per model; hp_* = one fit at MCMC.samplesize=16384, MCMC.interval=2048 (seed 4242)"
+
+[tolerance]
+# Observed statistics are deterministic functions of the graph.
+summary_statistics = 1e-9
+#
+# Both estimators are Monte-Carlo MLEs of the same likelihood, so they are
+# compared at R's own resolution. For coefficient k a Julia fit must lie
+# within  band_sd * sqrt(sd_k^2 + sd_k^2 / n_seeds)  of R's nine-seed mean,
+# where sd_k is R's seed-to-seed standard deviation (`*_coefficients_sd`):
+# the first term is one fit's own Monte-Carlo error (taken equal to R's),
+# the second the error of R's mean. A band floored at
+# `floor_se_fraction` of R's mean standard error keeps a coefficient whose
+# nine R fits happened to agree unusually closely from demanding more than
+# either sampler's O(1/ESS) bias allows. Standard errors likewise, against
+# `*_std_errors_sd`, floored at `floor_se_fraction` of the standard error.
+band_sd = 4.0
+floor_se_fraction = 0.1
+# The relative log-likelihood (bridge sampling on both sides): within
+# band_sd * sqrt(2) * R's seed-to-seed sd, floored at 1.0 log unit.
+loglik_floor = 1.0
+
+[values]
+# --- (a) zach, frozen as a valued edge list -----------------------------
+zach_n = 34
+zach_edge_src = [1, 1, 2, 1, 2, 3, 1, 1, 1, 5, 6, 1, 2, 3, 4, 1, 3, 3, 1, 5, 6, 1, 1, 4, 1, 2, 3, 4, 6, 7, 1, 2, 1, 2, 1, 2, 24, 25, 3, 24, 25, 3, 24, 27, 2, 9, 1, 25, 26, 29, 3, 9, 15, 16, 19, 21, 23, 24, 30, 31, 32, 9, 10, 14, 15, 16, 19, 20, 21, 23, 24, 27, 28, 29, 30, 31, 32, 33]
+zach_edge_dst = [2, 3, 3, 4, 4, 4, 5, 6, 7, 7, 7, 8, 8, 8, 8, 9, 9, 10, 11, 11, 11, 12, 13, 13, 14, 14, 14, 14, 17, 17, 18, 18, 20, 20, 22, 22, 26, 26, 28, 28, 28, 29, 30, 30, 31, 31, 32, 32, 32, 32, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 33, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34, 34]
+zach_edge_weight = [4, 5, 6, 3, 3, 3, 3, 3, 3, 2, 5, 2, 4, 4, 3, 2, 5, 1, 2, 3, 3, 3, 1, 3, 3, 5, 3, 3, 3, 3, 2, 1, 2, 2, 2, 2, 5, 2, 2, 4, 3, 2, 3, 4, 2, 3, 2, 2, 7, 2, 2, 3, 3, 3, 1, 3, 2, 5, 4, 3, 4, 4, 2, 3, 2, 4, 2, 1, 1, 3, 4, 2, 4, 2, 2, 3, 4, 5]
+zach_term_names = ["sum", "nonzero", "transitiveweights.min.max.min"]
+zach_summary_statistics = [231, 78, 172]
+zach_seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+zach_coefficients_seed1 = [0.59849515141764165, -4.7846608670306701, 0.56024908306011456]
+zach_std_errors_seed1 = [0.12051144048823757, 0.24097643311243938, 0.097637129292182628]
+zach_coefficients_seed2 = [0.59613483314319093, -4.7923364702171121, 0.56771657021162925]
+zach_std_errors_seed2 = [0.11893673388212325, 0.24671232059228179, 0.098260533111613188]
+zach_coefficients_seed3 = [0.59655516987001067, -4.7644564744268907, 0.55737517831001482]
+zach_std_errors_seed3 = [0.12396363852658102, 0.23061129337174499, 0.10205708987077074]
+zach_coefficients_seed4 = [0.59672926281230643, -4.7851339129660566, 0.56493139486450938]
+zach_std_errors_seed4 = [0.11687543353712064, 0.23802129053823562, 0.098575060865274539]
+zach_coefficients_seed5 = [0.59154926447823786, -4.7743236587582221, 0.56571755311663452]
+zach_std_errors_seed5 = [0.12272038163017319, 0.2397708667135118, 0.10330433263530354]
+zach_coefficients_seed6 = [0.5953007773613862, -4.7763135261254996, 0.56046348602106599]
+zach_std_errors_seed6 = [0.12053339083192505, 0.23255074360664793, 0.10319585997590711]
+zach_coefficients_seed7 = [0.60919722323511039, -4.7950503363974608, 0.55662896942470841]
+zach_std_errors_seed7 = [0.12228930387977757, 0.24079856532091434, 0.10118991707115246]
+zach_coefficients_seed8 = [0.59907662355089952, -4.7772412010547756, 0.56122969438786241]
+zach_std_errors_seed8 = [0.11998267949928568, 0.23639893913222818, 0.10034284315486247]
+zach_coefficients_seed9 = [0.59334228249945753, -4.7651617252968306, 0.56579112695077804]
+zach_std_errors_seed9 = [0.12426354363025061, 0.22992532942345897, 0.10520684405891435]
+zach_coefficients_mean = [0.59737562092980456, -4.7794086858081686, 0.56223367292747972]
+zach_coefficients_sd = [0.0050130671351453727, 0.010833007945644546, 0.0039564910181489046]
+zach_std_errors_mean = [0.12111961621171939, 0.23730730909016257, 0.10108551222622011]
+zach_std_errors_sd = [0.0024157707502214147, 0.0055166199985444272, 0.0025991043274929317]
+zach_logliks = [383.4367971765538, 383.36793486856806, 383.98219370443968, 383.54972139832057, 385.36343547167155, 383.85455230107823, 383.99505180967384, 386.21523831376248, 384.31234658727158]
+zach_loglik_mean = 384.23080795903775
+zach_loglik_sd = 0.9569024107026326
+zach_hp_coefficients = [0.59998951543227319, -4.7807445803915583, 0.56108243104493671]
+zach_hp_std_errors = [0.11995632100604858, 0.23525755336359075, 0.10029849478064068]
+zach_hp_loglik = 384.60550189942182
+
+# --- (b) the seeded directed matrix, frozen as a valued edge list -------
+directed_n = 14
+directed_edge_src = [2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 1, 4, 6, 7, 9, 10, 11, 12, 13, 1, 4, 5, 6, 7, 10, 12, 13, 3, 5, 6, 7, 8, 9, 10, 14, 1, 2, 3, 4, 6, 8, 9, 10, 11, 13, 1, 4, 5, 8, 10, 11, 12, 13, 14, 1, 4, 5, 6, 8, 9, 11, 12, 14, 3, 5, 9, 11, 14, 1, 3, 5, 7, 8, 11, 13, 14, 1, 2, 3, 4, 8, 11, 12, 13, 14, 1, 5, 6, 8, 9, 10, 12, 13, 14, 1, 2, 3, 4, 6, 7, 10, 11, 13, 14, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 1, 2, 4, 7, 8, 9, 11, 12, 13]
+directed_edge_dst = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 8, 8, 8, 9, 9, 9, 9, 9, 9, 9, 9, 10, 10, 10, 10, 10, 10, 10, 10, 10, 11, 11, 11, 11, 11, 11, 11, 11, 11, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 13, 14, 14, 14, 14, 14, 14, 14, 14, 14]
+directed_edge_weight = [1, 1, 2, 1, 1, 1, 2, 3, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 2, 3, 2, 2, 2, 1, 1, 1, 2, 1, 3, 2, 1, 2, 1, 1, 1, 2, 3, 2, 1, 1, 1, 1, 1, 1, 2, 2, 2, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 2, 2, 1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 2, 3, 1, 1, 3, 1, 1, 2, 2, 1, 1, 1, 1, 2, 1, 1, 1, 2, 2, 2, 2, 1, 2, 2, 1, 2, 1, 3, 3, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 2, 1, 2, 2, 2, 2, 1]
+directed_term_names = ["sum", "nonzero", "mutual.min"]
+directed_summary_statistics = [187, 126, 66]
+directed_seeds = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+directed_coefficients_seed1 = [-0.5744494623631573, 0.020480463422458066, 1.4709051957504702]
+directed_std_errors_seed1 = [0.15724308732334097, 0.2292863667438374, 0.29855140958970289]
+directed_coefficients_seed2 = [-0.546725518589253, -0.020447937213839605, 1.4537745866766332]
+directed_std_errors_seed2 = [0.161487777870267, 0.21880903450914452, 0.31418531733342192]
+directed_coefficients_seed3 = [-0.54969799146355947, 0.010482532063400787, 1.4388310920481584]
+directed_std_errors_seed3 = [0.15121589296819143, 0.23019178674846327, 0.32113272442426316]
+directed_coefficients_seed4 = [-0.56275474476019549, 0.0046378584354274943, 1.4748431647611078]
+directed_std_errors_seed4 = [0.16279134505430626, 0.24041762483322748, 0.30762298452357595]
+directed_coefficients_seed5 = [-0.57231623989401126, -0.0081085006220536181, 1.4914381405356627]
+directed_std_errors_seed5 = [0.15921928877559391, 0.23952396189936598, 0.30398442455084401]
+directed_coefficients_seed6 = [-0.56767592175542259, -0.0042380992736098418, 1.4907243634782028]
+directed_std_errors_seed6 = [0.16132018200408801, 0.23268951942810001, 0.31301926742228486]
+directed_coefficients_seed7 = [-0.5637935882809616, -0.0089950808714357698, 1.4689209920503477]
+directed_std_errors_seed7 = [0.15893788381551655, 0.22352840247596789, 0.29876498879234681]
+directed_coefficients_seed8 = [-0.54809110650597304, -0.0053653265530875767, 1.4683970015253656]
+directed_std_errors_seed8 = [0.1545605886086899, 0.22180848119716834, 0.28573776115698402]
+directed_coefficients_seed9 = [-0.55552751703115932, -0.013611551368160675, 1.4681025555225149]
+directed_std_errors_seed9 = [0.16069483107737773, 0.22872085390462979, 0.30829698057584876]
+directed_coefficients_mean = [-0.56011467673818816, -0.0027961824423223041, 1.469548565816496]
+directed_coefficients_sd = [0.0105203740500579, 0.01263563813541943, 0.01640744350245403]
+directed_std_errors_mean = [0.15860787527748574, 0.22944178130443385, 0.30569953981880804]
+directed_std_errors_sd = [0.0037228107779658051, 0.0074167406243753203, 0.010457140794322185]
+directed_logliks = [14.900298862033774, 14.735336621377121, 14.572106146313251, 14.009744155911765, 14.480117280041199, 14.781803603762867, 15.172208261692157, 14.780032483042433, 15.010059486597029]
+directed_loglik_mean = 14.715745211196843
+directed_loglik_sd = 0.3377332601470866
+directed_hp_coefficients = [-0.56185547059844931, -0.0082991303927805026, 1.4755040526214782]
+directed_hp_std_errors = [0.15645462226801174, 0.22788335659486642, 0.30433282158109404]
+directed_hp_loglik = 14.481213681018721
